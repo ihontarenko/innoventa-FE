@@ -1,0 +1,101 @@
+/* The typefaces, served by this application rather than fetched from Google — see fonts.css for what
+   that fixed and why the subsets are the ones they are. Must precede Tailwind: @import is only legal
+   at the top of a stylesheet, and a face that arrives after the rules using it still repaints. */
+@import "./fonts.css";
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Prose. A page's markdown is the one place this interface renders a *document* rather than a screen,
+   and documents need a typographic scale the component classes deliberately do not have. */
+@plugin "@tailwindcss/typography";
+
+/* The markdown library's own constructs — callouts, diagrams, applets, pickers. It ships its own
+   stylesheet and asks for colours through `--markdown-*`, which are mapped below. */
+@import "@jmouse/markdown/styles.css";
+
+/* The shared render layer: the token contract and the base rules the primitives cannot work without
+   (most of all `.anchored-panel`, which positions every dropdown, menu, select and tooltip), then the
+   palette catalogue — which is Innoventa's own 27 themes in the first place, plus the `atlas` pair
+   Tessera added. */
+@import "@jmouse/ui/styles.css";
+@import "@jmouse/ui/presets/themes.css";
+
+/* ⚠️ The colours code is read in, and they are deliberately NOT the theme's. This interface used to
+   paint syntax from `--primary` and the chart ramp, and the result was the argument for this file:
+   on the dark themes a scope instance and the fields inside a `when` condition landed a few percent
+   from the background, and there was no light/dark split at all, because a chart ramp is not built
+   for one. Six palettes, each declared twice, and no application theme reaches them. */
+@import "@jmouse/codemirror/styles.css";
+
+/* ⚠️ Tailwind does not scan node_modules on its own, and every primitive is in there. Without this
+   line the package's classes are never generated and the application comes up unstyled, with no error
+   anywhere to say so. */
+@source "../node_modules/@jmouse/ui/dist";
+@source "../node_modules/@jmouse/files/dist";
+@source "../node_modules/@jmouse/codemirror/dist";
+@source "../node_modules/@jmouse/query/dist";
+@source "../node_modules/@jmouse/avatars/dist";
+
+@theme {
+  /* ⚠️ One typeface in all three text roles, and the reason is Cyrillic. Onest carries latin,
+     latin-ext, cyrillic and cyrillic-ext across all four weights; the faces it replaced covered no
+     Cyrillic at all, so every Ukrainian string was drawn by the system fallback and the product
+     looked like it had inconsistent font weights rather than a missing download.
+
+     The three names are kept apart even though they now resolve alike: `font-display` and
+     `font-brand` mark the places whose typeface is a decision, so a future split stays a one-line
+     change rather than a hunt through the components. */
+  --font-sans: "Onest", system-ui, sans-serif;
+  --font-display: "Onest", system-ui, sans-serif;
+  --font-brand: "Onest", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Courier New", monospace;
+}
+
+/* ⚠️ **The markdown library asks for colour through its own names, and this is the whole bridge.**
+   `@jmouse/markdown` styles its constructs against `--markdown-*` custom properties so it can be
+   dropped into any product without knowing that product's tokens. Innoventa's answer is below.
+
+   Nothing else in this application may read a `--markdown-*` name: they exist so the library has one
+   place to look, and a component that reached for one would be borrowing a contract that is not its.
+
+   ⚠️ These are theme tokens, not fixed colours — so all 29 palettes and both light and dark follow
+   automatically. A literal here would be a callout that stays teal in a crimson theme. */
+@layer base {
+  :root {
+    --markdown-paper: var(--background);
+    --markdown-paper-2: var(--muted);
+    --markdown-line: var(--border);
+
+    --markdown-ink: var(--foreground);
+    --markdown-ink-2: var(--foreground);
+    --markdown-ink-3: var(--muted-foreground);
+    --markdown-ink-4: var(--muted-foreground);
+
+    --markdown-accent: var(--primary);
+    --markdown-accent-soft: color-mix(in srgb, var(--primary) 10%, transparent);
+    --markdown-teal: var(--primary);
+
+    --markdown-danger: var(--destructive);
+    --markdown-warn: var(--chart-4, oklch(0.68 0.16 70));
+    --markdown-ok: var(--chart-2, oklch(0.65 0.14 160));
+
+    --markdown-r: var(--radius);
+    --markdown-r-md: calc(var(--radius) + 2px);
+
+    --markdown-font-mono: var(--font-mono);
+    --markdown-font-sans: var(--font-sans);
+  }
+}
+
+/**
+ * How much bigger an embedded surface is than the page around it.
+ *
+ * ⚠️ **`zoom`, and only ever on an embed.** An embed is a whole page rendered inside somebody else's
+ * rectangle, so scaling all of it — text, controls, padding — is exactly right. The application itself
+ * must NOT use this: `zoom` on a scrolling shell puts every floating-ui and Radix panel in the wrong
+ * place, because they measure against an unzoomed viewport. An embed has no sidebar, no popovers over
+ * a scroll container and no shell, which is the whole reason it is safe here and nowhere else.
+ */
+@utility scaled-surface {
+  zoom: var(--surface-scale, 1);
+}

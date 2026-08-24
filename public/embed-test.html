@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Embed test — a hostile host page</title>
+  <!--
+    A deliberately opinionated page, for testing that an Innoventa embed survives being dropped into
+    somebody else's site — and, just as importantly, that it does not change the site around it.
+
+    ⚠️ The styles below are aggressive ON PURPOSE. Serif body type, a lurid background, a global
+    `box-sizing` other than the embed's, `* { color }` — these are the things a real host page does and
+    an embed has to be immune to. A test page styled like Innoventa proves nothing.
+  -->
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: content-box; }
+    body {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 19px;
+      line-height: 1.7;
+      color: #2b1a00;
+      background: repeating-linear-gradient(135deg, #fdf3d8, #fdf3d8 22px, #f7e7bd 22px, #f7e7bd 44px);
+    }
+    header, main, footer { max-width: 760px; margin: 0 auto; padding: 32px 24px; }
+    h1 { font-size: 42px; margin: 0 0 8px; letter-spacing: -0.5px; }
+    h2 { font-size: 26px; border-bottom: 3px double #b98900; padding-bottom: 6px; }
+    p  { margin: 0 0 16px; }
+    .card { background: #fffdf6; border: 3px solid #b98900; border-radius: 0; padding: 20px; }
+    .note { font-style: italic; color: #7a5c00; }
+    iframe { width: 100%; border: 0; display: block; }
+    button { font-family: inherit; font-size: 17px; padding: 8px 16px; background: #b98900; color: #fff; border: 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>The Gazette of Counting Things</h1>
+    <p class="note">
+      A host page with loud opinions about typography, so an embed that leaks is obvious immediately.
+    </p>
+  </header>
+
+  <main>
+    <h2>Before the embed</h2>
+    <p>
+      This paragraph is serif, 19px, brown, on a striped background. If any of that changes after the
+      iframe loads, the embed is leaking styles into its host — which is the one thing it must never do.
+    </p>
+    <p><button type="button">A host button, in the host's colours</button></p>
+
+    <h2>The embed</h2>
+    <div class="card">
+      <!--
+        ⚠️ `scrolling="no"` and no fixed height: the frame reports its own height and this page listens.
+        A height set here would be a guess, and guesses are either a scrollbar or a gap.
+      -->
+      <iframe id="innoventa" src="/_/form/feedback-form/embed" title="Innoventa feedback form" scrolling="no"></iframe>
+    </div>
+    <p class="note" id="reported">Waiting for the frame to report its height…</p>
+
+    <h2>After the embed</h2>
+    <p>
+      Still serif, still 19px, still brown. The iframe is a document boundary, so this is expected rather
+      than impressive — the test is that nothing here had to be defended.
+    </p>
+    <p><button type="button">The same host button, unchanged</button></p>
+  </main>
+
+  <footer>
+    <p class="note">Open with <code>?theme=dracula</code> or <code>&amp;scale=1.25</code> on the iframe src to check those too.</p>
+  </footer>
+
+  <script>
+    // The host half of the contract, written by hand — deliberately NOT importing anything from the
+    // product, so this page tests the message rather than the implementation that sends it.
+    const frame = document.getElementById('innoventa');
+    const reported = document.getElementById('reported');
+
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'innoventa:embed-resize' && frame.contentWindow === event.source) {
+        frame.style.height = event.data.height + 'px';
+        reported.textContent = 'Frame reported ' + event.data.height + 'px.';
+      }
+    });
+  </script>
+</body>
+</html>
