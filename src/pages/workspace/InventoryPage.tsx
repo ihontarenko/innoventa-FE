@@ -5,6 +5,11 @@ import { Badge, Button, type FilterItem, FilterPanel, Input, Skeleton, cn } from
 import { LevelDoor, LevelDoors } from "@/components/LevelDoor"
 import { PageHeader } from "@/components/PageHeader"
 import { ViewBar } from "@/components/ViewBar"
+import { ToggleChip } from "@/components/ToggleChip"
+import { QueryPanel, type AppliedQuery } from "@jmouse/query"
+import { entriesOf, ENTRIES } from "@/components/query/subjects"
+import { presetsFor } from "@/components/query/presets"
+import { QUERY_LABELS } from "@/components/query/labels"
 import { Pagination } from "@/components/Pagination"
 import { EntryDetailDrawer } from "@/components/form/EntryDetailDrawer"
 import { FieldValue } from "@/components/form/FieldValue"
@@ -84,6 +89,8 @@ export function InventoryPage({
   const [selectedFormId, setSelectedFormId] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   const [page, setPage] = useState(0)
+  const [jmq, setJmq] = useState<AppliedQuery>({})
+  const [composing, setComposing] = useState(false)
   const [editing, setEditing] = useState<{ entry: FormEntry | null; formId: string } | null>(null)
   const [activeViewId, setActiveViewId] = useState<string | null>(null)
 
@@ -136,6 +143,7 @@ export function InventoryPage({
     page,
     PAGE_SIZE,
     query,
+    jmq,
   )
   const { data: everyPage, isLoading: everyLoading } = useEntriesByPurpose(
     isAllTypes ? purposeCode : undefined,
@@ -205,6 +213,18 @@ export function InventoryPage({
                 setActiveViewId(null)
               }}
             />
+            {/* ⚠️ Disabled rather than hidden while no type is chosen: a control that appears once you
+                pick something reads as *it was not there a moment ago*, and the reason it cannot be used
+                is worth stating rather than hiding. */}
+            <ToggleChip
+              active={composing}
+              disabled={!selectedFormId}
+              title={selectedFormId ? undefined : `Choose a type first — its fields are what a filter names`}
+              onClick={() => setComposing((previous) => !previous)}
+            >
+              Filter
+            </ToggleChip>
+
             <Button
               size="sm"
               disabled={forms.length === 0}
@@ -215,6 +235,28 @@ export function InventoryPage({
           </>
         }
       />
+
+      {/*
+        ⚠️ Below the header rather than in a drawer: a filter somebody is composing and the rows it will
+        narrow belong on one screen. A panel that covered the list would make every adjustment a guess.
+
+        ⚠️ Only once a type is chosen. `entries` has no vocabulary of its own — what may be named comes
+        from the FORM, so offering the builder over "all types" would offer an empty one, which reads as
+        *this has no fields* rather than as *pick a type first*.
+      */}
+      {selectedFormId && composing && (
+        <QueryPanel
+          subject={entriesOf(selectedFormId)}
+          query={jmq}
+          presets={presetsFor(ENTRIES)}
+          labels={QUERY_LABELS}
+          onApply={(applied) => {
+            setJmq(applied)
+            setPage(0)
+            setActiveViewId(null)
+          }}
+        />
+      )}
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[15rem_minmax(0,1fr)]">
         <FilterPanel
