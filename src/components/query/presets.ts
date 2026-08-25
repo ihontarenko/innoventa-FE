@@ -30,34 +30,34 @@ import type { QueryPreset } from "@jmouse/query"
  */
 const INVENTORY_PRESETS: readonly QueryPreset[] = [
   {
-    label: "Закінчується",
-    explains: "Менше десяти одиниць на складі",
+    label: "Running out",
+    explains: "Fewer than ten in stock",
     needs: ["entry[quantity]"],
     filter: "entry[quantity] | int < 10",
     sort: { by: "entry[quantity]" },
   },
   {
-    label: "Нічого не лишилось",
-    explains: "Нуль на складі — те, що треба замовити першим",
+    label: "Nothing left",
+    explains: "Zero in stock — what to order first",
     needs: ["entry[quantity]"],
     filter: "entry[quantity] | int == 0",
   },
   {
-    label: "Без кількості",
-    explains: "Позиції, у яких кількість узагалі не вказана",
+    label: "No quantity",
+    explains: "Rows where no quantity was recorded at all",
     needs: ["entry[quantity]"],
     filter: "entry[quantity] is null",
   },
   {
-    label: "Додані за тиждень",
-    explains: "Усе, що з'явилось у списку за останні сім днів",
+    label: "Added this week",
+    explains: "Everything that appeared in the last seven days",
     needs: ["created"],
     filter: "created > now() - days(7)",
     sort: { by: "created", descending: true },
   },
   {
-    label: "Мої записи",
-    explains: "Те, що вносили саме ви",
+    label: "Mine",
+    explains: "The rows you recorded yourself",
     needs: ["submitter"],
     filter: "submitter == currentMember",
   },
@@ -69,39 +69,39 @@ const INVENTORY_PRESETS: readonly QueryPreset[] = [
  */
 const EQUIPMENT_PRESETS: readonly QueryPreset[] = [
   {
-    label: "На руках",
-    explains: "Видане комусь і ще не повернуте",
+    label: "Out on loan",
+    explains: "Given to somebody and not back yet",
     needs: ["asset[state]"],
     filter: "asset[state] == 'ISSUED'",
   },
   {
-    label: "Доступне",
-    explains: "Те, що можна взяти прямо зараз",
+    label: "Available",
+    explains: "What can be taken right now",
     needs: ["asset[state]"],
     filter: "asset[state] == 'AVAILABLE'",
   },
   {
-    label: "У ремонті",
-    explains: "Виведене з обігу — обслуговування або ремонт",
+    label: "In for repair",
+    explains: "Out of circulation — servicing or repair",
     needs: ["asset[state]"],
     filter: "asset[state] == 'IN_SERVICE'",
   },
   {
-    label: "Списане",
-    explains: "Більше не в обігу — історія лишається, рухів більше не буде",
+    label: "Written off",
+    explains: "No longer in circulation — the history stays, the movements stop",
     needs: ["asset[state]"],
     filter: "asset[state] == 'WRITTEN_OFF'",
   },
   {
-    label: "Нове під наглядом",
-    explains: "Взяте на облік за останні тридцять днів",
+    label: "Newly watched",
+    explains: "Brought under watch in the last thirty days",
     needs: ["asset[watched]"],
     filter: "asset[watched] > now() - days(30)",
     sort: { by: "asset[watched]", descending: true },
   },
   {
-    label: "Давно не чіпали",
-    explains: "Нічого не змінювалось понад пів року",
+    label: "Untouched for a long time",
+    explains: "Nothing has changed in over six months",
     needs: ["asset[updated]"],
     filter: "asset[updated] < now() - months(6)",
     sort: { by: "asset[updated]" },
@@ -122,7 +122,7 @@ const BY_SUBJECT: Record<string, readonly QueryPreset[]> = {
  * The presets this subject and this schema can actually answer.
  *
  * ⚠️ An unusable one is **dropped silently**, and that is right: somebody who never had `quantity` on
- * their form never wondered where *"закінчується"* went, and a disabled chip explaining why would be an
+ * their form never wondered where *"running out"* went, and a disabled chip explaining why would be an
  * apology for a feature they never asked for.
  *
  * ⚠️ A subject nobody wrote presets for gets none rather than somebody else's — the presets are the one
