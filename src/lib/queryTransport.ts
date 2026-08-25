@@ -1,4 +1,4 @@
-import { transportOver } from "@jmouse/query"
+import { transportOver, type QueryTransport } from "@jmouse/query"
 import { http } from "@/api/http"
 
 /**
@@ -16,12 +16,39 @@ import { http } from "@/api/http"
  * backend means moving it here — the address lives in exactly two places and there is deliberately no
  * third.
  */
-export const queryTransport = transportOver(
-  async (method, url, body) => {
-    const response =
-      method === "GET" ? await http.get(url) : await http.post(url, body)
+const PREFIX = "/query"
 
-    return response.data
+const request = async (method: string, url: string, body?: unknown) => {
+  const response =
+    method === "GET"
+      ? await http.get(url)
+      : method === "PUT"
+        ? await http.put(url, body)
+        : method === "DELETE"
+          ? await http.delete(url)
+          : await http.post(url, body)
+
+  return response.data
+}
+
+export const queryTransport: QueryTransport = {
+  ...transportOver((method, url, body) => request(method, url, body), PREFIX),
+
+  /**
+   * ⚠️ The saved-view half, and naming it here is how this product adopts saved views.
+   *
+   * The library renders no shelf without it — not an empty one, not a disabled button — because a shelf
+   * that can never fill reads as *you have saved nothing* rather than as *this product does not keep
+   * these*, and the first is a lie somebody acts on.
+   *
+   * ⚠️ A view here belongs to the WORKSPACE, not to the member: what a query may name comes from the
+   * forms of one workspace, so a view following somebody between workspaces would be a saved question
+   * that refuses on sight. The backend subject decides that, not this file.
+   */
+  views: {
+    list: (subject) => request("GET", `${PREFIX}/${subject.name}/views`),
+    save: (subject, draft) => request("POST", `${PREFIX}/${subject.name}/views`, draft),
+    update: (subject, id, draft) => request("PUT", `${PREFIX}/${subject.name}/views/${id}`, draft),
+    remove: (subject, id) => request("DELETE", `${PREFIX}/${subject.name}/views/${id}`),
   },
-  "/query",
-)
+}

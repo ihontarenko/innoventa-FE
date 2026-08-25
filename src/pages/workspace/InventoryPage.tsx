@@ -7,8 +7,7 @@ import { PageHeader } from "@/components/PageHeader"
 import { ViewBar } from "@/components/ViewBar"
 import { ToggleChip } from "@/components/ToggleChip"
 import { QueryPanel, type AppliedQuery } from "@jmouse/query"
-import { entriesOf, ENTRIES } from "@/components/query/subjects"
-import { presetsFor } from "@/components/query/presets"
+import { entriesOf } from "@/components/query/subjects"
 import { QUERY_LABELS } from "@/components/query/labels"
 import { Pagination } from "@/components/Pagination"
 import { EntryDetailDrawer } from "@/components/form/EntryDetailDrawer"
@@ -248,7 +247,6 @@ export function InventoryPage({
         <QueryPanel
           subject={entriesOf(selectedFormId)}
           query={jmq}
-          presets={presetsFor(ENTRIES)}
           labels={QUERY_LABELS}
           onApply={(applied) => {
             setJmq(applied)

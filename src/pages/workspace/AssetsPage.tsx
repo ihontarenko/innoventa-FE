@@ -21,8 +21,7 @@ import { RegisterAssetDialog } from "@/components/custody/RegisterAssetDialog"
 import { ScanDialog } from "@/components/custody/ScanDialog"
 import { useAssetForms, useAssets } from "@/hooks/useCustody"
 import { QueryPanel, type AppliedQuery } from "@jmouse/query"
-import { assetsOf, ASSETS } from "@/components/query/subjects"
-import { presetsFor } from "@/components/query/presets"
+import { assetsOf } from "@/components/query/subjects"
 import { QUERY_LABELS } from "@/components/query/labels"
 import { useMaintenanceBoard } from "@/hooks/useMonitoring"
 import { capitalised, useTerm } from "@/hooks/useTerminology"
@@ -233,7 +232,6 @@ export function AssetsPage() {
         <QueryPanel
           subject={assetsOf(formId)}
           query={jmq}
-          presets={presetsFor(ASSETS)}
           labels={QUERY_LABELS}
           placeholder="asset[state] == 'AVAILABLE'"
           onApply={(applied) => {

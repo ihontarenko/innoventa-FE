@@ -7,8 +7,7 @@ import { Pagination } from "@/components/Pagination"
 import { SegmentedControl } from "@/components/SegmentedControl"
 import { ToggleChip } from "@/components/ToggleChip"
 import { QueryPanel, type AppliedQuery } from "@jmouse/query"
-import { entriesOf, ENTRIES } from "@/components/query/subjects"
-import { presetsFor } from "@/components/query/presets"
+import { entriesOf } from "@/components/query/subjects"
 import { QUERY_LABELS } from "@/components/query/labels"
 import { EntryDetailDrawer } from "@/components/form/EntryDetailDrawer"
 import { parseFileFieldValue } from "@/api/files"
@@ -215,7 +214,6 @@ export function ResultsPage() {
         <QueryPanel
           subject={entriesOf(formId)}
           query={jmq}
-          presets={presetsFor(ENTRIES)}
           labels={QUERY_LABELS}
           placeholder="entry[component_name] is contains('кос') and entry[quantity] | int < 5"
           onApply={(applied) => {
