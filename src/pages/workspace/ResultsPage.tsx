@@ -146,7 +146,7 @@ export function ResultsPage() {
             {/* ⚠️ Offered only on the one-form view — see the hook above for why. */}
             {formId && (
               <ToggleChip active={composing} onClick={() => setComposing((previous) => !previous)}>
-                Фільтр
+                Filter
               </ToggleChip>
             )}
 

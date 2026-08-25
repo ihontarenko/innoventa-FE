@@ -165,7 +165,7 @@ export function AssetsPage() {
         actions={
           <>
             <ToggleChip active={composing} onClick={() => setComposing((previous) => !previous)}>
-              Фільтр
+              Filter
             </ToggleChip>
 
             <ToggleChip
