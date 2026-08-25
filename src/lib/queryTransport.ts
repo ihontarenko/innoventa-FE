@@ -1,4 +1,9 @@
-import { transportOver, type QueryTransport } from "@jmouse/query"
+import {
+  playgroundTransportOver,
+  sourceTransportOver,
+  transportOver,
+  type QueryTransport,
+} from "@jmouse/query"
 import { http } from "@/api/http"
 
 /**
@@ -51,4 +56,24 @@ export const queryTransport: QueryTransport = {
     update: (subject, id, draft) => request("PUT", `${PREFIX}/${subject.name}/views/${id}`, draft),
     remove: (subject, id) => request("DELETE", `${PREFIX}/${subject.name}/views/${id}`),
   },
+
+  /**
+   * ⚠️ The declaration half — reading what a listing IS, and rewriting it where that is allowed.
+   *
+   * Naming it here is how this product adopts the Declaration and Attributes tabs; without it the
+   * screen shows neither, rather than showing tabs whose backend answers 404. What may actually be
+   * written is still decided per listing by `QuerySubject.origin` and `authorizeSourceWrite`, so
+   * wiring this does not make anything editable by itself.
+   */
+  sources: sourceTransportOver((method, url, body) => request(method, url, body), PREFIX),
+
+  /**
+   * ⚠️ Compiling a query without running it — the SQL, never the rows.
+   *
+   * The library deliberately does not execute anything: running a query needs a scope built from the
+   * session, paging and a loader, none of which is the same in two products. So what this wires up is
+   * the half that can honestly be shared, and it is also the half that answers the question somebody
+   * has while checking a mapping.
+   */
+  playground: playgroundTransportOver((method, url, body) => request(method, url, body), PREFIX),
 }

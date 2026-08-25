@@ -180,7 +180,8 @@ export function AssetsPage() {
             </ToggleChip>
 
             <Input
-              className="h-8 w-64 text-sm"
+              size="sm"
+              className="w-64"
               value={typed}
               placeholder={`Search everything about a ${thing}…`}
               onChange={(event) => {

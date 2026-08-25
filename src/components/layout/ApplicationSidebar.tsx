@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom"
-import { Pin, TriangleAlert } from "lucide-react"
+import { Bookmark, Pin, TriangleAlert } from "lucide-react"
 import {
   Sidebar,
   SidebarContent,
@@ -299,16 +299,10 @@ export function ApplicationSidebar() {
           <>
             {/* ⚠️ Above the menu and not in it: a scan is not a destination, it is how somebody selects
                 a thing without knowing which screen it is on. It draws nothing where the workspace
-                does not hand its things to people. */}
-            <SidebarGroup>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  <SidebarMenuItem>
-                    <QuickScan />
-                  </SidebarMenuItem>
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
+                does not hand its things to people — and it carries its own group, so *nothing* is what
+                it draws. Wrapped from here, its `null` emptied the chrome instead of removing it, and
+                every workspace without custody opened with a hole above its first heading. */}
+            <QuickScan />
 
             {/* ⚠️ Above the served menu, not below it. These are the questions somebody asks daily; at
                 the bottom of a menu with three groups above it they are past the fold, which is the one
@@ -316,6 +310,30 @@ export function ApplicationSidebar() {
             <PinnedViews spaceSlug={activeSpaceSlug} />
 
             <WorkspaceMenu spaceId={activeSpaceId} spaceSlug={activeSpaceSlug} pathname={location.pathname} />
+
+            {/* ⚠️ Client-side like `PinnedViews`, and NOT a served section. The workspace menu is what
+                this workspace decided to present — its modules and its screens — and this is neither: it
+                is where the questions asked *of* those screens are kept. A served entry would also mean
+                a backend change before a shared library's screen could be reached, which is the wrong
+                dependency for something every workspace has by construction. */}
+            <SidebarGroup>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={location.pathname.endsWith("/saved-views")}
+                      tooltip="Saved views"
+                    >
+                      <NavLink to={spaceSectionPath(activeSpaceSlug, "saved-views")}>
+                        <Bookmark />
+                        <span className="truncate">Saved views</span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
           </>
         ) : (
           <PlatformMenu pathname={location.pathname} />

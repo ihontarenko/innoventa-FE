@@ -8,7 +8,11 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarMenu,
   SidebarMenuButton,
+  SidebarMenuItem,
 } from "@jmouse/ui"
 import { AssetDrawer } from "@/components/custody/AssetDrawer"
 import { RecordReadingForm } from "@/components/custody/AssetReadings"
@@ -64,13 +68,31 @@ export function QuickScan() {
     return null
   }
 
+  /*
+    ⚠️ **It carries its own group, because it is the thing that decides whether it appears.**
+
+    The sidebar used to wrap this in `SidebarGroup > SidebarGroupContent > SidebarMenu > SidebarMenuItem`
+    and rely on the `null` above to leave nothing behind. It does not: returning `null` empties the
+    chrome, it does not remove it. Every workspace without custody drew an empty group — 12px of its own
+    padding with the column's `gap-2` on each side of it — which reads as a hole above the first heading
+    and as nothing at all in the markup that produced it.
+
+    So the rule is the one `PinnedViews` already follows: whatever decides *whether* something is in the
+    menu returns the group too, and a caller never wraps a component that can decline.
+  */
   return (
-    <>
-      <SidebarMenuButton onClick={() => setScanning(true)} title="Scan a code — Alt+S">
-        <ScanLine className="size-4" />
-        <span className="flex-1 text-left">Scan a code</span>
-        <kbd className="rounded border px-1 text-[10px] text-muted-foreground">Alt+S</kbd>
-      </SidebarMenuButton>
+    <SidebarGroup>
+      <SidebarGroupContent>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={() => setScanning(true)} title="Scan a code — Alt+S">
+              <ScanLine className="size-4" />
+              <span className="flex-1 text-left">Scan a code</span>
+              <kbd className="rounded border px-1 text-[10px] text-muted-foreground">Alt+S</kbd>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarGroupContent>
 
       {scanning && (
         <ScanDialog
@@ -83,7 +105,7 @@ export function QuickScan() {
       )}
 
       {found && <WhatNow resolution={found} onClose={() => setFound(null)} />}
-    </>
+    </SidebarGroup>
   )
 }
 

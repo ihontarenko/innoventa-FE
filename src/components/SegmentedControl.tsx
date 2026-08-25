@@ -11,32 +11,29 @@ export interface Segment<Value extends string> {
 export type SegmentedControlVariant = "solid" | "tabs"
 
 /**
- * How big it is drawn.
+ * ⚠️ **There is ONE size, and removing the choice is the fix.**
  *
- * ⚠️ **`control` matches the height of an `Input` and a small `Button`, and that is the whole point.**
- * A page header is a row of controls read as one row, so a segment control shorter than the search box
- * beside it reads as a caption that happens to be clickable rather than as its equal. `compact` stays
- * for a filter row *under* the header, where being smaller than the header is the correct signal.
+ * There were two — `compact` and `control` — and the difference was a pixel or two, so what they
+ * actually produced was two switchers of different heights **in the same row**: 30px beside 29px beside
+ * a 30px button. Nobody chooses that on purpose; it happens because a prop existed and two call sites
+ * answered it differently.
+ *
+ * A size prop is only worth having when the sizes are far enough apart to mean something. These were
+ * not, and a control that is *nearly* the height of its neighbours is worse than one that is plainly
+ * smaller — it reads as a mistake rather than as a hierarchy.
+ *
+ * So: `Button size="sm"` — 30px, `rounded-md`, 12.5px — and no way to ask for anything else.
  */
-export type SegmentedControlSize = "compact" | "control"
-
-const TRACK_SIZES: Record<SegmentedControlSize, string> = {
-  compact: "",
-  control: "h-8",
-}
-
-const SEGMENT_SIZES: Record<SegmentedControlSize, string> = {
-  compact: "",
-  control: "h-full px-3 text-sm",
-}
-
 const TRACK_STYLES: Record<SegmentedControlVariant, string> = {
-  solid: "gap-0.5 rounded-lg border bg-muted/40 p-0.5",
+  // ⚠️ `p-0`, and that is the part that matters. With padding, the track matched its neighbours while
+  // the FILLED segment inside it stood 25px against their 30px — and the filled thing is what an eye
+  // compares. Matching the frame while the paint disagrees is not matching.
+  solid: "h-[30px] rounded-md border bg-muted/40 p-0",
   tabs: "h-9 rounded-lg bg-muted p-[3px] text-muted-foreground",
 }
 
 const SEGMENT_STYLES: Record<SegmentedControlVariant, string> = {
-  solid: "rounded-md px-2.5 py-1 text-xs",
+  solid: "h-full rounded-md px-3 text-[12.5px]",
   tabs: "h-full whitespace-nowrap rounded-md border border-transparent px-2 py-1 text-sm font-medium",
 }
 
@@ -53,10 +50,14 @@ const IDLE_SEGMENT_STYLES: Record<SegmentedControlVariant, string> = {
 /**
  * A small group of mutually exclusive choices — pick one, the others turn off.
  *
- * Written once because two screens had grown the same markup with slightly different corners, and it
- * shows: the radii come from the theme's `--radius` the way every button does, so the control sits in
- * the same family as the board's filter toggles rather than reading as a sharp-cornered stranger. The
- * track is `rounded-lg`, the thumb `rounded-md`, which is the nesting the rest of the interface uses.
+ * Written once because two screens had grown the same markup with slightly different corners — and then
+ * grew two *sizes* and drifted again, which is why there is now exactly one of everything: 30px,
+ * `rounded-md`, 12.5px, the same as a `Button size="sm"` and an `Input size="sm"` standing beside it.
+ *
+ * ⚠️ **The segment fills the track rather than floating inside it.** The nesting a track normally has —
+ * an outer radius with a smaller one inset — is what made this read as foreign in a control row: the
+ * chosen segment was five pixels shorter than the button next to it and a step rounder, so the two
+ * filled shapes in one row never lined up. What a reader compares is the paint, not the frame.
  *
  * ⚠️ **`variant="tabs"` is for a control sitting directly under real tabs.** Two rows of choices in the
  * same corner of a screen — one a filled pill, one a raised tab — read as two unrelated mechanisms, so
@@ -70,7 +71,6 @@ export function SegmentedControl<Value extends string>({
   onChange,
   ariaLabel,
   variant = "solid",
-  size = "compact",
   fill = false,
   className,
 }: {
@@ -79,8 +79,6 @@ export function SegmentedControl<Value extends string>({
   onChange: (value: Value) => void
   ariaLabel: string
   variant?: SegmentedControlVariant
-  /** How tall. `control` sits in a page header beside inputs and buttons; `compact` in a filter row. */
-  size?: SegmentedControlSize
   /** Stretch to the container. Off by default — a control sized to its own words reads as a filter. */
   fill?: boolean
   className?: string
@@ -92,7 +90,6 @@ export function SegmentedControl<Value extends string>({
       className={cn(
         "inline-flex items-center",
         TRACK_STYLES[variant],
-        TRACK_SIZES[size],
         fill && "flex w-full",
         className,
       )}
@@ -107,7 +104,6 @@ export function SegmentedControl<Value extends string>({
           className={cn(
             "inline-flex items-center justify-center transition-colors",
             SEGMENT_STYLES[variant],
-            SEGMENT_SIZES[size],
             fill && "flex-1",
             segment.disabled && "cursor-not-allowed opacity-50",
             value === segment.value ? ACTIVE_SEGMENT_STYLES[variant] : IDLE_SEGMENT_STYLES[variant],

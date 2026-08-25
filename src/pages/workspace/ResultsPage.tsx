@@ -150,7 +150,8 @@ export function ResultsPage() {
             )}
 
             <Input
-              className="h-8 w-56 text-sm"
+              size="sm"
+              className="w-56"
               value={search}
               placeholder="Search every submission…"
               onChange={(event) => setSearch(event.target.value)}
@@ -175,7 +176,6 @@ export function ResultsPage() {
 
             {activeSpaceId && (
               <SegmentedControl
-                size="control"
                 value={scopedToWorkspace ? "space" : "everywhere"}
                 onChange={(next) => {
                   setScopedToWorkspace(next === "space")
@@ -190,7 +190,6 @@ export function ResultsPage() {
             )}
 
             <SegmentedControl
-              size="control"
               value={everybody ? "everyone" : "mine"}
               onChange={(next) => {
                 setEverybody(next === "everyone")
