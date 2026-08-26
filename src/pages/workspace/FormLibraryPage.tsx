@@ -22,6 +22,7 @@ import { SegmentedControl } from "@/components/SegmentedControl"
 import { CreateFormDialog } from "@/components/form/CreateFormDialog"
 import { EntryFormDialog } from "@/components/form/EntryFormDialog"
 import { FormManagementDialog } from "@/components/form/FormManagementDialog"
+import { FormPreviewDialog } from "@/components/form/FormPreviewDialog"
 import {
   useAllForms,
   useCreateEntry,
@@ -104,6 +105,7 @@ export function FormLibraryPage() {
   const [creating, setCreating] = useState(false)
   const [managedFormId, setManagedFormId] = useState<string | null>(null)
   const [filledFormId, setFilledFormId] = useState<string | null>(null)
+  const [previewFormId, setPreviewFormId] = useState<string | null>(null)
 
   // A workspace scope with no workspace to stand in would show nothing and explain nothing.
   const effectiveScope: LibraryScope = activeSpaceId ? scope : "everywhere"
@@ -219,7 +221,6 @@ export function FormLibraryPage() {
                 segment control by definition — modelling them as two independent toggles was the reason
                 the sizes never lined up. */}
             <SegmentedControl
-              size="control"
               ariaLabel="Which forms to show"
               value={effectiveScope}
               onChange={setScope}
@@ -230,7 +231,8 @@ export function FormLibraryPage() {
             />
 
             <Input
-              className="h-8 w-56 text-sm"
+              size="sm"
+              className="w-56"
               value={search}
               placeholder="Search forms…"
               onChange={(event) => setSearch(event.target.value)}
@@ -289,6 +291,7 @@ export function FormLibraryPage() {
                     form={form}
                     onSchema={() => navigate(spaceSectionPath(spaceSlug ?? "", `forms/${form.id}`))}
                     onOpenForm={() => setFilledFormId(form.id)}
+                    onPreview={() => setPreviewFormId(form.id)}
                     onSubmissions={() =>
                       navigate(`${spaceSectionPath(spaceSlug ?? "", "results")}?form=${form.id}`)
                     }
@@ -332,6 +335,8 @@ export function FormLibraryPage() {
       )}
 
       {managedForm && <FormManagementDialog form={managedForm} onClose={() => setManagedFormId(null)} />}
+
+      {previewFormId && <FormPreviewDialog formId={previewFormId} onClose={() => setPreviewFormId(null)} />}
     </>
   )
 }
@@ -343,6 +348,7 @@ function FormCard({
   submissions,
   onSchema,
   onOpenForm,
+  onPreview,
   onSubmissions,
   onManage,
   onDelete,
@@ -354,6 +360,8 @@ function FormCard({
   onSchema: () => void
   /** Opens the form itself, to be filled in and submitted. */
   onOpenForm: () => void
+  /** The form as somebody filling it in will meet it — in a window, recording nothing. */
+  onPreview: () => void
   /** Its own rows — the question the card could not answer at all before. */
   onSubmissions: () => void
   /** How many rows it holds here. Undefined while the batch is still in flight. */
@@ -425,6 +433,10 @@ function FormCard({
                   library that could only describe its forms put the one thing they are for behind
                   another screen — or, for a purpose with no second face, behind no screen at all.
                   Offered on a draft too: trying a schema out is exactly what a draft is for. */}
+              {/* ⚠️ Preview and *Fill it in* are not the same offer, and both belong here: one is the
+                  form as somebody will meet it, thrown away when the window closes; the other records
+                  a row. A library that only had the second made trying a schema out cost real data. */}
+              <DropdownMenuItem onSelect={onPreview}>Preview</DropdownMenuItem>
               <DropdownMenuItem onSelect={onOpenForm}>Fill it in</DropdownMenuItem>
               <DropdownMenuItem onSelect={onSubmissions}>See its submissions</DropdownMenuItem>
               <DropdownMenuItem onSelect={onManage}>Manage</DropdownMenuItem>

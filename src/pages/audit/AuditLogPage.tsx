@@ -12,6 +12,10 @@ import {
   useScanAuditMetaKeys,
 } from "@/hooks/useAudit"
 import { useAuthStore } from "@/stores/authStore"
+import { platformItem, requiredPermissionsOf } from "@/navigation"
+
+/** The declaration this screen is reached by — asked, never re-typed. See `AccessRequirement`. */
+const AUDIT_LOG = platformItem("audit-log")
 import { humanizeAuditValue } from "@/lib/auditEvent"
 import type { AuditEventFilters, AuditMetaFilter } from "@/api/audit"
 import { AuditEventDrawer } from "./AuditEventDrawer"
@@ -57,7 +61,7 @@ interface FacetSection {
  * reachable.
  */
 export function AuditLogPage() {
-  const holdsEverywhere = useAuthStore((state) => state.holdsEverywhere)
+  const mayOpen = useAuthStore((state) => state.holds)
 
   const [filters, setFilters] = useState<AuditEventFilters>(EMPTY_FILTERS)
   const [page, setPage] = useState(0)
@@ -142,13 +146,14 @@ export function AuditLogPage() {
 
   // ⚠️ Installation-wide on purpose: `audit:read` is meaningless below the installation, and the coarse
   // "holds it somewhere" answer would open this screen to anybody granted it in one workspace — which is
-  // the whole log, from a permission scoped to one place.
-  if (!holdsEverywhere("audit:read")) {
+  // the whole log, from a permission scoped to one place. That is now said ONCE, on the declaration in
+  // `navigation.ts`, and asked here — so the menu row and this refusal cannot come to different answers.
+  if (!mayOpen(AUDIT_LOG)) {
     return (
       <AccessDenied
         title="Audit log"
         why="The audit log is everything that has happened across the installation, so it is read with a permission held over the installation rather than in one workspace."
-        permissions={["audit:read"]}
+        permissions={requiredPermissionsOf(AUDIT_LOG)}
       />
     )
   }

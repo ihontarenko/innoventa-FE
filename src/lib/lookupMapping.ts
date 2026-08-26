@@ -1,5 +1,5 @@
 import type { PricingOffer } from "@/api/pricing"
-import { PRICING_CONFIG_KEYS } from "@/lib/formConfigs"
+import { FORM_CONFIG_KEYS, PRICING_CONFIG_KEYS } from "@/lib/formConfigs"
 import type { FieldDetail } from "@/types"
 import type { ValueSynonym } from "@/api/valueSynonyms"
 
@@ -29,6 +29,44 @@ export const OFFER_MAPPINGS: Array<{
   { configKey: PRICING_CONFIG_KEYS.DATASHEET_URL_FIELD, label: "Datasheet", read: (offer) => offer.dataSheetUrl },
   { configKey: PRICING_CONFIG_KEYS.IMAGE_URL_FIELD, label: "Image", read: (offer) => offer.imageUrl },
 ]
+
+/**
+ * What a distributor's answer offers as a FILE, and which field would hold it.
+ *
+ * ⚠️ **A different thing from the two URL mappings above, not a duplicate of them.** A datasheet URL is
+ * a line somebody follows to a distributor who may retire it; a datasheet *file* is a copy this
+ * installation keeps, and a workspace that configured a file field asked for the copy. Both may be set
+ * on one form, and then both are offered — the URL to follow and the PDF to hold.
+ *
+ * ⚠️ **The picture's key is `display.image_field`, which is the same field the tables and the record
+ * draw their thumbnail from.** There is no separate `pricing.image_file_field` and there should not be:
+ * a second place to say where the picture goes is a second place for it to be said differently.
+ */
+export const ATTACHMENT_MAPPINGS: Array<{
+  configKey: string
+  label: string
+  read: (offer: PricingOffer) => string | null
+}> = [
+  {
+    configKey: PRICING_CONFIG_KEYS.DATASHEET_FILE_FIELD,
+    label: "Datasheet file",
+    read: (offer) => offer.dataSheetUrl,
+  },
+  { configKey: FORM_CONFIG_KEYS.IMAGE_FIELD, label: "Picture", read: (offer) => offer.imageUrl },
+]
+
+const ATTACHABLE_TYPES = new Set(["FILE", "IMAGE"])
+
+/**
+ * Whether a field can hold a downloaded file at all.
+ *
+ * ⚠️ **Asked of the FIELD, never assumed from the configuration key.** `display.image_field` is
+ * frequently a plain URL field — the address of a picture on somebody else's server — and writing a
+ * `token:filename` reference into one would render the reference as text where the picture used to be.
+ */
+export function isAttachableField(field: FieldDetail | undefined): boolean {
+  return !!field && ATTACHABLE_TYPES.has(field.elementType)
+}
 
 const CHOICE_TYPES = new Set(["SELECT", "RADIO"])
 

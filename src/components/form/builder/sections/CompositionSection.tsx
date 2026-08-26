@@ -36,6 +36,7 @@ export function CompositionSection({
   return (
     <EditorSection
       title="Composition"
+      icon="⊞"
       badge={children.length}
       hint={field.elementType === "COMPLEX_COMPOSITE" ? "joined into one value" : "each child holds its own value"}
     >

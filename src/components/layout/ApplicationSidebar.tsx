@@ -1,5 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom"
 import { Bookmark, Pin, TriangleAlert } from "lucide-react"
+import { activePath } from "@/lib/menuActivation"
 import {
   Sidebar,
   SidebarContent,
@@ -18,7 +19,7 @@ import { AccountMenu } from "@/components/layout/AccountMenu"
 import { QuickScan } from "@/components/custody/QuickScan"
 import { useAllSavedViews } from "@/hooks/useSavedViews"
 import { SpaceSwitcher } from "@/components/layout/SpaceSwitcher"
-import { platformSections } from "@/navigation"
+import { MANUAL_ITEM, platformSections } from "@/navigation"
 import { spaceSectionPath } from "@/lib/navigationContext"
 import { spaceMenuIcon } from "@/lib/spaceMenuIcons"
 import { useSpaceNavigation } from "@/hooks/useSpaces"
@@ -30,26 +31,6 @@ import {
   spaceScope,
   useNavigationPreferencesStore,
 } from "@/stores/navigationPreferencesStore"
-
-function isItemActive(pathname: string, itemPath: string) {
-  return pathname === itemPath || pathname.startsWith(`${itemPath}/`)
-}
-
-/**
- * The one entry the current location counts as being on.
- *
- * ⚠️ **One winner, not a predicate per row.** `/admin/access` is described by both **Users** (`/admin`)
- * and **Access control**, and two highlighted rows read as a broken menu rather than as a nested place.
- * Longest path wins, so a future `/admin/settings/x` can never be outranked by `/admin`.
- */
-function activePath(paths: string[], pathname: string): string | null {
-  return (
-    paths
-      .filter((path) => isItemActive(pathname, path))
-      .sort((first, second) => second.length - first.length)
-      .at(0) ?? null
-  )
-}
 
 /**
  * The menu the workspace itself serves.
@@ -295,6 +276,10 @@ export function ApplicationSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
+        {/* ⚠️ **Two menus, and Administration is not a third one.** The column swaps for a *workspace*,
+            because a workspace serves its own menu and decides what is in it. Administration and the
+            Workbench are screens you go to, and each carries its own rail — a page, not a mode the
+            whole application enters. */}
         {activeSpaceId && activeSpaceSlug ? (
           <>
             {/* ⚠️ Above the menu and not in it: a scan is not a destination, it is how somebody selects
@@ -341,6 +326,21 @@ export function ApplicationSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
+        {/* ⚠️ **The manual is here rather than in a group, and it is not an oversight.** It is anonymous
+            public reading served out of Kiwi — no permission, no account needed — which makes it help
+            rather than a destination, and help belongs with the chrome. Above the account row because
+            it is about the product; the row below it is about the person. */}
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild size="sm" tooltip={MANUAL_ITEM.label}>
+              <NavLink to={MANUAL_ITEM.path} className="text-muted-foreground">
+                <MANUAL_ITEM.icon />
+                <span className="truncate">{MANUAL_ITEM.label}</span>
+              </NavLink>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+
         <AccountMenu />
       </SidebarFooter>
     </Sidebar>

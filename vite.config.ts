@@ -1,9 +1,14 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { jmousePwa } from '@jmouse/pwa/vite'
 import { fileURLToPath } from 'node:url'
 import { execSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
+// ⚠️ Relative, not `@/…`: the alias below configures the APPLICATION's resolver and this file is read
+// before it exists. And `./src/lib/mark` deliberately imports nothing — see the note in it.
+import { stationDefinitions } from './src/stationDefinitions.js'
+import { DEFAULT_MARK_PALETTE, drawMark } from './src/lib/mark.js'
 
 /**
  * Which build is answering, stamped in at build time.
@@ -64,7 +69,52 @@ const apiTarget = process.env.INNOVENTA_API_TARGET ?? 'http://localhost:8080'
  * It is also the family port: Moneta 5020, Tessera 5050, Kiwi 5070, Innoventa 5010.
  */
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    // One manifest per station, one service worker for all of them, and the mark painted into each
+    // station's icons. See `src/stationDefinitions.ts` for why that list is read here as well as by
+    // the interface.
+    jmousePwa({
+      stations: stationDefinitions,
+      applicationName: 'Innoventa',
+      themeColor: DEFAULT_MARK_PALETTE.plate,
+      backgroundColor: '#ffffff',
+      language: 'en',
+      paintIcons: {
+        draw: (_station, colours) => drawMark(colours),
+        colours: DEFAULT_MARK_PALETTE,
+        // ⚠️ iOS reads THIS and ignores the manifest icons entirely; with no PNG it puts a screenshot
+        // of the page on the home screen. Re-render it with `node scripts/paint-apple-touch-icon.mjs`
+        // whenever the mark changes.
+        appleTouchIcon: () => '/apple-touch-icon.png',
+      },
+      // ⚠️ `/kiwi-api` joins `/api` because it is another product's backend reached across origins —
+      // an answer a cache could serve is an answer about somebody else's authorization.
+      // ⚠️ `/jmouse` covers every library at once now — see the proxy entry below for why there is one
+      // rule rather than one per library.
+      serviceWorker: { networkOnlyPrefixes: ['/api', '/kiwi-api', '/jmouse', '/oauth2', '/login'] },
+    }),
+  ],
+  /**
+   * ⚠️ **One HTML entry per station, and they cannot be consolidated.** A browser reads the manifest
+   * from the document it loaded, so a single-entry application can offer exactly one installable
+   * identity — whichever manifest happened to be linked at load. Swapping `<link rel="manifest">`
+   * after a client-side navigation does not reliably re-arm the installation prompt.
+   *
+   * ⚠️ **This is not duplication and must not be "simplified" away.** All the entries share one bundle
+   * graph, so the stations cost one worker and one precache between them; the only thing that differs
+   * is which manifest each document names. Consolidating them breaks installation and nothing else,
+   * which means it fails quietly, months later, on somebody's phone.
+   */
+  build: {
+    rollupOptions: {
+      input: {
+        shell: fileURLToPath(new URL('./index.html', import.meta.url)),
+        components: fileURLToPath(new URL('./station/components/index.html', import.meta.url)),
+      },
+    },
+  },
   define: {
     __APPLICATION_VERSION__: JSON.stringify(applicationVersion),
     __BUILD_DATE__: JSON.stringify(buildDate),
@@ -104,6 +154,8 @@ export default defineConfig({
     },
   },
   server: {
+    allowedHosts: ["innoventa.net"],
+    host:  '0.0.0.0',
     port: 5010,
     strictPort: true,
     proxy: {
@@ -121,16 +173,15 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (requestPath) => requestPath.replace(/^\/kiwi-api/, '/api'),
       },
-      // ⚠️ The AI management screens, served by `jmouse-ai-management` at its own prefix rather than
-      // under /api — deliberately, so every route beneath it is visibly not Innoventa's own. A second
-      // entry rather than a rewrite: the address is real on the backend, and pretending otherwise here
-      // would hide the one thing it exists to show. The prefix lives in three files at once
-      // (backend yaml, this proxy, `api/ai.ts`) and nothing fails loudly when they drift.
-      '/jmai': { target: apiTarget, changeOrigin: true, xfwd: true },
-      // ⚠️ Files and the directory tree, served by `jmouse-storage-management` at
-      // `jmouse.files.management.prefix` — same arrangement, same reason, same three files to keep in
-      // step: that property, this entry, and `api/files.ts`'s client.
-      '/jmouse-files': { target: apiTarget, changeOrigin: true, xfwd: true },
+      // ⚠️ **Every jMouse library, in one rule** (Ivan, 2026-08-25). Files, AI, the query builder and
+      // live blocks all answer under `/jmouse/<namespace>/api` now, so this entry is the last one this
+      // file will ever need for a library — the previous arrangement was an entry per library
+      // (`/jmai`, `/jmouse-files`) and a fourth one forgotten every time a module arrived.
+      //
+      // ⚠️ The address is still written in two files that nothing compares: the backend composes it and
+      // `src/api/libraryRoutes.ts` is the interface's only copy. When they drift every call 404s and no
+      // screen raises an error of its own — a file manager with no files, AI screens with no providers.
+      '/jmouse': { target: apiTarget, changeOrigin: true, xfwd: true },
       // Backend-served bytes. Everything else under `/_/` is an SPA route, so an avatar left
       // unproxied is answered with index.html and every picture becomes a broken image in dev only.
       '/_/file': { target: apiTarget, changeOrigin: true, xfwd: true },
@@ -146,3 +197,4 @@ export default defineConfig({
     },
   },
 })
+

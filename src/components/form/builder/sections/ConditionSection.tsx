@@ -57,7 +57,7 @@ export function ConditionSection({
   const needsValue = !VALUELESS_OPERATORS.has(draft.operator)
 
   return (
-    <EditorSection title="Condition" badge={condition ? "set" : undefined} defaultOpen={!!condition}>
+    <EditorSection title="Condition" icon="⚡" badge={condition ? "set" : undefined} defaultOpen={!!condition}>
       <div className="grid grid-cols-[auto_1fr] items-center gap-2 text-xs">
         <span className="text-muted-foreground">When</span>
         <select

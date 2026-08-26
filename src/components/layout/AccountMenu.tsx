@@ -20,8 +20,8 @@ import { useSignOut } from "@/hooks/useProfile"
  * about the work.
  *
  * ⚠️ **Access control is not here, and its absence is the point.** It was offered from this menu, to
- * holders of `access:read` — a second door onto `/admin/access`, which the sidebar's Administration
- * group already carries under the same permission and the same label. A duplicate entry is not a
+ * holders of `access:read` — a second door onto `/admin/access`, which the Administration screen
+ * already carries under the same permission and the same label. A duplicate entry is not a
  * shortcut: it asks the reader to work out whether the two lead to the same screen. Tessera and Kiwi
  * moved their own out of this menu on the same day, for the harder version of the same reason — over
  * there it was the ONLY way in, and the account menu is what is about *you*, not about everybody.

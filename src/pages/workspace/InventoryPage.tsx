@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { useQueries } from "@tanstack/react-query"
+import { useQueries, useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Badge, Button, type FilterItem, FilterPanel, Input, Skeleton, cn } from "@jmouse/ui"
 import { LevelDoor, LevelDoors } from "@/components/LevelDoor"
@@ -11,6 +11,8 @@ import { entriesOf } from "@/components/query/subjects"
 import { QUERY_LABELS } from "@/components/query/labels"
 import { Pagination } from "@/components/Pagination"
 import { EntryDetailDrawer } from "@/components/form/EntryDetailDrawer"
+import { StockSummaryStrip } from "@/components/inventory/StockSummaryStrip"
+import { CadWorkbench } from "@/components/cad/CadWorkbench"
 import { FieldValue } from "@/components/form/FieldValue"
 import { formsApi } from "@/api/forms"
 import type { SpaceForm } from "@/api/spaces"
@@ -52,10 +54,25 @@ const PAGE_SIZE = 25
  */
 export function InventoryPage({
   purposeCode = "INVENTORY",
+  companionPurposeCodes = [],
   title = "Inventory",
   noun = "component",
 }: {
   purposeCode?: string
+  /**
+   * ⚠️ **Further purposes whose types appear in the rail beside this screen's own.**
+   *
+   * <p>One menu entry can cover more than one kind of thing when they are the same question asked
+   * about different things — a catalogue of parts and a catalogue of the drawings those parts are
+   * placed as. The rail is what tells them apart, and a second menu entry for each new kind is how a
+   * menu stops being one.
+   *
+   * ⚠️ **They widen the rail and nothing else.** The screen's own identity — which saved views belong
+   * to it, which other faces it offers a door to, what "everything" means — stays the primary purpose.
+   * Merging the row lists would page two unlike things together and collapse the columns to what a
+   * part and a footprint have in common, which is almost nothing.
+   */
+  companionPurposeCodes?: string[]
   title?: string
   noun?: string
 } = {}) {
@@ -90,10 +107,33 @@ export function InventoryPage({
   const [page, setPage] = useState(0)
   const [jmq, setJmq] = useState<AppliedQuery>({})
   const [composing, setComposing] = useState(false)
-  const [editing, setEditing] = useState<{ entry: FormEntry | null; formId: string } | null>(null)
+  const [editing, setEditing] = useState<{
+    entry: FormEntry | null
+    formId: string
+    /** What a NEW row starts with — read only when there is no entry. */
+    initialValues?: Record<string, string>
+    /** What those seeded answers are called, for the fields whose choices come from a source. */
+    initialOptionLabels?: Record<string, Record<string, string>>
+  } | null>(null)
   const [activeViewId, setActiveViewId] = useState<string | null>(null)
 
-  const { data: forms = [], isLoading: formsLoading } = useWorkspaceForms(purposeCode)
+  /**
+   * ⚠️ **Memoised, because it is a query key.** An array literal rebuilt on every render is a new key
+   * every render — the request would repeat forever while the screen looked entirely correct.
+   */
+  const railPurposeCodes = useMemo(
+    () => [purposeCode, ...companionPurposeCodes],
+    [purposeCode, companionPurposeCodes.join(",")],
+  )
+
+  const { data: forms = [], isLoading: formsLoading } = useWorkspaceForms(railPurposeCodes)
+
+  /**
+   * ⚠️ **"Everything" means everything of THIS screen's purpose, and the label has to say so.** With a
+   * companion purpose in the rail, "All types" would promise the footprints too and deliver only the
+   * parts — a label that is wrong in the one place somebody checks whether the filter is on.
+   */
+  const allTypesLabel = companionPurposeCodes.length > 0 ? `All ${noun}s` : "All types"
 
   // A workspace switch has to forget which type was open — the id belongs to the workspace we left.
   useEffect(() => {
@@ -130,6 +170,46 @@ export function InventoryPage({
     return byId
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [forms, detailQueries.map((query) => query.dataUpdatedAt).join(",")])
+
+  /**
+   * ⚠️ **Whether the rows in view are drawings** — decided by the selected type's PURPOSE, never by a
+   * form id, so a second CAD catalogue is treated the same with nothing here to update.
+   *
+   * ⚠️ And only when one type is selected: a mixed page has no single shape to take, so it stays a table.
+   */
+  const showsDrawings = selectedFormId !== null && details[selectedFormId]?.purpose?.code === "CAD"
+
+  /**
+   * Which type a new file is recorded against.
+   *
+   * ⚠️ **Not in the rail, and that is deliberate** — files are seen through the drawing they belong to,
+   * never as a loose list — so this screen has to look the form up for itself. The first one, because a
+   * workspace with two file types has a question nobody has asked yet and guessing an answer here would
+   * be the wrong place to answer it.
+   */
+  const { data: cadFileForms = [] } = useWorkspaceForms("CAD_FILE", { enabled: showsDrawings })
+  const cadFilesFormId = cadFileForms[0]?.id ?? null
+
+  /**
+   * The CAD Files type's own schema.
+   *
+   * ⚠️ **Asked for on its own, because the rail is not the list of forms this screen edits.** Every other
+   * schema arrives with the rail; this one is deliberately absent from it, so a lookup built from the rail
+   * has nothing under its id — and an editor with no schema does not fail, it simply never renders. The
+   * button reads as dead, with no error anywhere to say why.
+   */
+  const { data: cadFilesForm = null } = useQuery({
+    queryKey: ["forms", cadFilesFormId],
+    queryFn: () => formsApi.get(cadFilesFormId!).then((response) => response.data),
+    enabled: cadFilesFormId !== null,
+    staleTime: 5 * 60_000,
+  })
+
+  /** Every schema this screen can open an editor on — the rail's, plus the file type that is not in it. */
+  const editableForms = useMemo(
+    () => (cadFilesForm ? { ...details, [cadFilesForm.id]: cadFilesForm } : details),
+    [details, cadFilesForm],
+  )
 
   const activeForm = selectedFormId ? (details[selectedFormId] ?? null) : null
 
@@ -192,8 +272,8 @@ export function InventoryPage({
     setActiveViewId(viewId)
   })
 
-  const activeLabel = activeForm ? (activeForm.codename ?? activeForm.name) : "All types"
-  const editedForm = editing ? (details[editing.formId] ?? null) : null
+  const activeLabel = activeForm ? (activeForm.codename ?? activeForm.name) : allTypesLabel
+  const editedForm = editing ? (editableForms[editing.formId] ?? null) : null
 
   return (
     <>
@@ -202,8 +282,16 @@ export function InventoryPage({
         description={`${activeLabel} — ${entriesPage?.totalElements ?? 0} recorded`}
         actions={
           <>
+            {/*
+              ⚠️ `size="sm"` is the row's size, and every control here now takes it. This said
+              `h-8 … text-sm` — thirty-two pixels and a fourteen-pixel face, next to a chip at
+              thirty-two and a button at thirty, so three controls stood at two heights and two type
+              sizes. None of the three was wrong on its own; what was missing was a shared knob, which
+              `Input` now has.
+            */}
             <Input
-              className="h-8 w-64 text-sm"
+              size="sm"
+              className="w-64"
               value={search}
               placeholder={`Search every ${noun}…`}
               onChange={(event) => {
@@ -262,7 +350,7 @@ export function InventoryPage({
           items={filterItems}
           activeKey={selectedFormId}
           onSelect={select}
-          allLabel="All types"
+          allLabel={allTypesLabel}
           allIcon="☰"
           allCount={total}
           searchable={filterItems.length > 8}
@@ -273,6 +361,12 @@ export function InventoryPage({
         />
 
         <div className="flex min-w-0 flex-col gap-3">
+          {/* ⚠️ Above the filters and outside them, because it answers a different question. What the
+              workspace holds is a fact about the workspace; what the list below shows is a fact about
+              whatever has been typed into the search box. A figure that moved with the filter would be
+              read as the whole and be wrong — the breakdown inside it is how one type is asked. */}
+          <StockSummaryStrip purposeCode={purposeCode} noun={noun} selectedFormId={selectedFormId} />
+
           <ViewBar
             section={section}
             filter={{ formId: selectedFormId, search }}
@@ -325,13 +419,53 @@ export function InventoryPage({
             />
           ) : (
             <div className="flex flex-col overflow-hidden rounded-md border">
-              <EntriesTable
-                entries={visible}
-                forms={forms}
-                details={details}
-                activeForm={activeForm}
-                onOpen={(entry) => setEditing({ entry, formId: entry.formId })}
-              />
+              {/*
+                ⚠️ **A drawing is looked at, a part is read.** A footprint is told apart from the one
+                beside it by its shape, not by the tail of its name — so the CAD types render as tiles
+                while everything else stays the table it has always been. The switch is on the selected
+                type's PURPOSE, never on a form id: a second CAD catalogue gets the same treatment with
+                nothing here to update, and "all types" keeps the table because a mixed page has no one
+                shape to take.
+              */}
+              {showsDrawings ? (
+                <CadWorkbench
+                  entries={visible}
+                  onOpen={(entry) => setEditing({ entry, formId: entry.formId })}
+                  onAddFile={(drawing) => {
+                    /*
+                      ⚠️ **The file form, with the drawing already chosen.** Its `cad_drawing` is a
+                      REQUIRED select, so arriving at an empty one from a drawing's own screen would ask
+                      somebody to answer a question they have just answered by being there.
+                    */
+                    if (!cadFilesFormId) {
+                      toast.error("This workspace has no CAD Files type — add it in the form library.")
+                      return
+                    }
+
+                    setEditing({
+                      entry: null,
+                      formId: cadFilesFormId,
+                      initialValues: { cad_drawing: drawing.id },
+                      /* ⚠️ The name goes with the id. The select fetches its choices only while the
+                         picker is open, so a seeded value with no label reads as ‹deleted› — about the
+                         very drawing whose screen this was opened from. */
+                      initialOptionLabels: {
+                        cad_drawing: {
+                          [drawing.id]: drawing.fieldValues?.cad_identifier ?? drawing.id,
+                        },
+                      },
+                    })
+                  }}
+                />
+              ) : (
+                <EntriesTable
+                  entries={visible}
+                  forms={forms}
+                  details={details}
+                  activeForm={activeForm}
+                  onOpen={(entry) => setEditing({ entry, formId: entry.formId })}
+                />
+              )}
 
               {entriesPage && entriesPage.totalPages > 1 && (
                 <Pagination
@@ -357,6 +491,8 @@ export function InventoryPage({
               : undefined
           }
           entry={editing.entry ?? undefined}
+          initialValues={editing.initialValues}
+          initialOptionLabels={editing.initialOptionLabels}
           isNew={!editing.entry}
           isSubmitting={createEntry.isPending || updateEntry.isPending}
           onSubmit={async (values) => {

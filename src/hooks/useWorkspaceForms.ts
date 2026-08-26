@@ -36,17 +36,32 @@ const FORM_KEYS = {
  * workspace's own decision — see its settings screen — so a filter here would be the browser answering a
  * question the backend owns, and answering it differently.
  */
-export function useWorkspaceForms(purposeCode?: string) {
+export function useWorkspaceForms(
+  purposeCode?: string | string[],
+  /**
+   * ⚠️ **Off means DO NOT ASK, which is not the same as asking for everything.** Passing no purpose is a
+   * legitimate question — every form this workspace shows — so a caller that only sometimes needs an
+   * answer has to say so, or a screen that wanted nothing quietly fetches five hundred rows.
+   */
+  { enabled = true }: { enabled?: boolean } = {},
+) {
   const spaceId = useSpaceStore((state) => state.activeSpaceId)
 
+  /**
+   * ⚠️ **Part of the key, and flattened so it cannot vary by identity.** A caller passing an array
+   * literal builds a new array on every render; keyed on the array itself, react-query would see a new
+   * key each time and refetch forever while looking perfectly correct.
+   */
+  const purposeKey = Array.isArray(purposeCode) ? purposeCode.join(",") : purposeCode
+
   return useQuery<SpaceForm[]>({
-    queryKey: ["spaces", spaceId, "forms", purposeCode ?? "all"],
+    queryKey: ["spaces", spaceId, "forms", purposeKey ?? "all"],
     // ⚠️ A page of 500 rather than a page control. A workspace showing more forms than that is a real
     // thing to page, and a real thing to notice — but a catalogue screen that pages at twenty makes
     // grouping by category meaningless, because a category could be split across two pages.
     queryFn: () =>
       spaceSettingsApi.formsPaged(spaceId!, 0, 500, purposeCode).then((response) => response.data.content),
-    enabled: Boolean(spaceId),
+    enabled: enabled && Boolean(spaceId),
   })
 }
 

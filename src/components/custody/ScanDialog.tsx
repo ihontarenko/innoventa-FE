@@ -1,5 +1,14 @@
-import { useEffect, useRef, useState } from "react"
-import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from "@jmouse/ui"
+import { useState } from "react"
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  useCodeScanner,
+} from "@jmouse/ui"
 import { custodyApi, type ScanResolution } from "@/api/custody"
 
 /**
@@ -27,60 +36,11 @@ export function ScanDialog({
   const [typed, setTyped] = useState("")
   const [busy, setBusy] = useState(false)
   const [answer, setAnswer] = useState<ScanResolution | null>(null)
-  const [cameraProblem, setCameraProblem] = useState<string | null>(null)
 
-  const videoRef = useRef<HTMLVideoElement | null>(null)
-
-  useEffect(() => {
-    // ⚠️ Feature-detected rather than assumed, and failing is not an error state: no camera means the
-    // typed field, which was always going to be there.
-    const detectorAvailable = "BarcodeDetector" in window
-
-    if (!detectorAvailable) {
-      setCameraProblem("This browser cannot read codes from a camera — type what is printed instead.")
-      return
-    }
-
-    let stream: MediaStream | null = null
-    let stopped = false
-
-    async function watch() {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream
-          await videoRef.current.play()
-        }
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const detector = new (window as any).BarcodeDetector({
-          formats: ["qr_code", "code_128", "ean_13", "code_39"],
-        })
-
-        while (!stopped && videoRef.current) {
-          const found = await detector.detect(videoRef.current)
-
-          if (found.length > 0) {
-            void look(found[0].rawValue)
-            return
-          }
-
-          await new Promise((wake) => setTimeout(wake, 250))
-        }
-      } catch {
-        setCameraProblem("The camera could not be opened — type what is printed instead.")
-      }
-    }
-
-    void watch()
-
-    return () => {
-      stopped = true
-      stream?.getTracks().forEach((track) => track.stop())
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  // ⚠️ The camera half is 's  — the same one the Components station reads
+  // codes with. It produces a STRING and stops there; what a code means is this dialog's business and
+  // the station's separately, which is exactly the half that must not be shared.
+  const { videoRef, problem: cameraProblem } = useCodeScanner({ onCode: (code) => void look(code) })
 
   async function look(code: string) {
     setBusy(true)

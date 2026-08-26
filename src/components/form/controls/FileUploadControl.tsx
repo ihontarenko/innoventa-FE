@@ -4,6 +4,7 @@ import { Button, cn } from "@jmouse/ui"
 import { composeFileFieldValue, fileLinks, parseFileFieldValue } from "@/api/files"
 import { extensionForFormat, imageProcessingOf } from "@/lib/imageProcessing"
 import { useUploadFile } from "@/hooks/useFiles"
+import { useUploadDestination } from "@/components/form/UploadDestination"
 import { usePublicConfiguration } from "@/hooks/useSystemSettings"
 import { ExistingFilePicker } from "./ExistingFilePicker"
 import { ImageCropDialog } from "./ImageCropDialog"
@@ -30,6 +31,10 @@ export function FileUploadControl({ field, value, onChange, hasError, acceptImag
   const { data: publicConfig } = usePublicConfiguration()
   const uploadFile = useUploadFile()
 
+  // ⚠️ Where this form.s uploads belong. Undefined for a form that belongs to no feature — a public
+  // fill, a one-off — and that keeps landing in the cabinet exactly as it always did.
+  const rootName = useUploadDestination()
+
   const [progress, setProgress] = useState<number | null>(null)
   const [error, setError] = useState("")
   const [isPicking, setPicking] = useState(false)
@@ -50,7 +55,7 @@ export function FileUploadControl({ field, value, onChange, hasError, acceptImag
 
     try {
       const file = blob instanceof File ? blob : new File([blob], name, { type: blob.type || "image/jpeg" })
-      const uploaded = await uploadFile.mutateAsync({ file, onProgress: setProgress })
+      const uploaded = await uploadFile.mutateAsync({ file, rootName, onProgress: setProgress })
 
       if (!uploaded.viewToken) {
         setError("That upload has no public link, so it cannot be attached here.")

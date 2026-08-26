@@ -11,6 +11,7 @@ import {
   DialogTitle,
   Input,
 } from "@jmouse/ui"
+import { GlyphInput } from "@/components/GlyphInput"
 import { PlainSelect } from "@/components/access/PolicyEditingKit"
 import { useCategories, useCreateForm, usePurposes } from "@/hooks/useWorkspaceForms"
 import { spaceSectionPath } from "@/lib/navigationContext"
@@ -103,17 +104,11 @@ export function CreateFormDialog({
         </DialogHeader>
 
         <div className="flex gap-2">
-          <label className="flex w-20 flex-col gap-1">
+          <label className="flex flex-col gap-1">
             <span className="text-xs font-medium">Glyph</span>
             {/* One character or one emoji. It is what the card leads with, and a word there would be the
-                name written twice. */}
-            <Input
-              className="h-8 text-center text-sm"
-              maxLength={2}
-              value={icon}
-              placeholder="◫"
-              onChange={(event) => setIcon(event.target.value)}
-            />
+                name written twice. Typed or picked — see `GlyphInput`. */}
+            <GlyphInput value={icon} onChange={setIcon} />
           </label>
 
           <label className="flex flex-1 flex-col gap-1">

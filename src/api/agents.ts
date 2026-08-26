@@ -5,7 +5,7 @@ import { http } from "./http"
  *
  * ⚠️ **No `update` and no `delete`, and the routes behind them are gone from the backend too.**
  * `PATCH /api/agents/{id}` was a SECOND way to grant an agent something, beside the shared
- * `PUT /jmai/api/my-agents/{id}/grants` that both products answer — two editors over one set of rows is
+ * `PUT /jmouse/ai/api/my-agents/{id}/grants` that both products answer — two editors over one set of rows is
  * how two screens come to disagree about what an agent holds. Use `aiApi.replaceAgentGrants` and
  * `aiApi.discardAgent`.
  */

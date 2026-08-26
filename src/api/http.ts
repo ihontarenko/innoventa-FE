@@ -54,7 +54,7 @@ function isPublicRoute(): boolean {
  * A client on one base path, carrying everything this application expects of an HTTP call.
  *
  * ⚠️ **A factory rather than a single instance, because there is more than one base path.**
- * `jmouse-ai-management` answers under its own prefix (`/jmai/api`) — deliberately not under `/api`,
+ * `jmouse-ai-management` answers under its own prefix (`/jmouse/ai/api`) — deliberately not under `/api`,
  * so a request log can tell a handler the library ships from one Innoventa wrote. What must NOT differ
  * between the two is any of this: the bearer token, the active workspace, the refresh queue. Copying an
  * interceptor stack per base path is how a screen quietly stops refreshing its token and starts

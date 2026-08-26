@@ -1,10 +1,11 @@
 import { createApiClient } from "./http"
+import { LIBRARY_ROUTES } from "./libraryRoutes";
 
 /**
  * The machinery behind the assistant and the protocol endpoint, as one screen reads it.
  *
  * <p>⚠️ <strong>These are the library's own routes now.</strong> `jmouse-ai-management` serves all six,
- * mounted at `/jmai/api` (`jmouse.ai.management.prefix`) — an address nobody would invent by accident,
+ * mounted at `/jmouse/ai/api` (`jmouse.ai.management.prefix`) — an address nobody would invent by accident,
  * so a request log can say at a glance which handler the library ships. The price is that the Vite
  * proxy and `nginx.conf` each need that second prefix; leave either out and every call here answers
  * 404 while the backend is perfectly healthy. Innoventa's own copy of that module — a controller, a service, a repository and
@@ -182,7 +183,7 @@ export interface AiPreferenceDraft {
 /**
  * Where `jmouse-ai-management` answers.
  *
- * <p>`/jmai/api` because `jmouse.ai.management.prefix` says so, which is the whole of what this product
+ * <p>`/jmouse/ai/api` because `jmouse.ai.management.prefix` says so, which is the whole of what this product
  * decides about these routes — the paths below are the library's own spelling and are not ours to
  * rename.
  *
@@ -193,7 +194,7 @@ export interface AiPreferenceDraft {
  * prefix must also be taught to the Vite proxy and to `UI/nginx.conf`, or it is reachable from the
  * backend and from nowhere else.
  */
-const managementHttp = createApiClient('/jmai/api');
+const managementHttp = createApiClient(LIBRARY_ROUTES.ai);
 
 /**
  * Whose permissions an agent acts with.

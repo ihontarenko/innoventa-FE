@@ -174,9 +174,25 @@ export const spaceSettingsApi = {
    * ⚠️ **The paged route, narrowed by PURPOSE.** A workspace showing four hundred forms and a screen
    * that wants only the component types is the case this exists for; filtering the flat list in the
    * browser would fetch all four hundred to draw twelve.
+   *
+   * ⚠️ **Several purposes are asked for by passing an array.** One screen showing two kinds of
+   * catalogue is the case: they are the same question asked about different things, and splitting them
+   * into two requests would page each one separately and make a single ordered list impossible.
+   *
+   * ⚠️ **Joined with a comma HERE, deliberately, rather than handed to Axios as an array.** Axios
+   * serialises an array as `purposeCode[]=A&purposeCode[]=B`, and a backend reading `purposeCode` finds
+   * no such parameter — so the filter is silently dropped and the screen fills with every form in the
+   * workspace. A comma-separated value binds to a list on the other side and reads identically when
+   * there is only one.
    */
-  formsPaged: (spaceId: string, page: number, size: number, purposeCode?: string) =>
-    http.get<Page<SpaceForm>>(`/spaces/${spaceId}/forms/paged`, { params: { page, size, purposeCode } }),
+  formsPaged: (spaceId: string, page: number, size: number, purposeCode?: string | string[]) =>
+    http.get<Page<SpaceForm>>(`/spaces/${spaceId}/forms/paged`, {
+      params: {
+        page,
+        size,
+        purposeCode: Array.isArray(purposeCode) ? purposeCode.join(",") : purposeCode,
+      },
+    }),
 
   availableForms: (spaceId: string) => http.get<SpaceForm[]>(`/spaces/${spaceId}/forms/available`),
 

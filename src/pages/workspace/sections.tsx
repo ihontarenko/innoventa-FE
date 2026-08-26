@@ -8,6 +8,12 @@ import { LabelsPage } from "./LabelsPage"
 import { FormLibraryPage } from "./FormLibraryPage"
 import { InspectionsPage } from "./InspectionsPage"
 import { InventoryPage } from "./InventoryPage"
+
+/**
+ * ⚠️ Module-level so its identity is stable — it reaches a query key, and an array literal rebuilt on
+ * every render is a new key on every render.
+ */
+const CATALOG_COMPANIONS = ["CAD"]
 import { LocationsPage } from "./LocationsPage"
 import { PagesPage } from "./PagesPage"
 import { PeoplePage } from "./PeoplePage"
@@ -68,7 +74,19 @@ export const SCREENS: Record<string, ComponentType> = {
   labels: LabelsPage,
   // ⚠️ The same component, a different purpose — and deliberately not the same screen. Stock counts what
   // is on the shelf; the catalogue records what a part *is*, whether or not one is in a drawer.
-  catalog: () => <InventoryPage purposeCode="CATALOG" title="Parts catalog" noun="part" />,
+  //
+  // ⚠️ **Two catalogues, one entry.** Parts, and the drawings those parts are placed as — told apart by
+  // the type rail this screen already had, rather than by a second item in the menu. A menu that grows
+  // an entry for every kind of thing stops being a menu, and the two are looked up together anyway: the
+  // question "which footprint does this take" starts on the part.
+  catalog: () => (
+    <InventoryPage
+      purposeCode="CATALOG"
+      companionPurposeCodes={CATALOG_COMPANIONS}
+      title="Catalogs"
+      noun="part"
+    />
+  ),
 }
 
 /** Which domain ticket owns which section — the same split the epic's table describes. */

@@ -49,7 +49,7 @@ export function PolicySubjectsPane({
         empty={{
           glyph: "◎",
           title: "No subjects here",
-          message: "Handing one power to one person is an assignment, not a policy edit — /admin does that.",
+          message: "Handing one power to one person is an assignment, not a policy edit — /admin/users does that.",
         }}
       >
         {subjects.map((subject, index) => {

@@ -5,6 +5,10 @@ import { Callout } from "@/components/Callout"
 import { PageHeader } from "@/components/PageHeader"
 import { useAiOverview } from "@/hooks/useAiAdministration"
 import { useAuthStore } from "@/stores/authStore"
+import { platformItem, requiredPermissionsOf } from "@/navigation"
+
+/** The declaration this screen is reached by — asked, never re-typed. See `AccessRequirement`. */
+const AI = platformItem("ai")
 import type { AiOverview } from "@/api/ai"
 import { ActivityPanel } from "./ActivityPanel"
 import { AgentsPanel } from "./AgentsPanel"
@@ -33,11 +37,16 @@ const OPENABLE_PANELS: Panel[] = ["provider", "prompt", "catalogue", "agents", "
  * rewritten (`INVT-0049`).
  */
 export function AiAdministrationPage() {
-  // Installation-wide, like every item in the administration section: the catalogue and the counters
-  // belong to the installation rather than to any workspace.
-  const holdsEverywhere = useAuthStore((state) => state.holdsEverywhere)
-  const mayRead = holdsEverywhere("ai:read")
-  const mayAdminister = holdsEverywhere("ai:administer")
+  // The door is the declaration's to answer — installation-wide, because the catalogue and the counters
+  // belong to the installation rather than to any workspace, and that is said once in `navigation.ts`.
+  const mayOpen = useAuthStore((state) => state.holds)
+  const mayRead = mayOpen(AI)
+
+  // ⚠️ **A WRITE gate, and it is right that it is typed here.** `ai:administer` leads to no menu row and
+  // has no declaration to ask; the one-declaration rule is about a destination's *door*, not about every
+  // control behind it. Reaching for `platformItem` here would invent an entry for a screen that is
+  // already on the Administration screen once.
+  const mayAdminister = useAuthStore((state) => state.holdsEverywhere)("ai:administer")
 
   /**
    * ⚠️ **The opening panel comes from the fragment, so a link can land on one.** A client's detail on
@@ -58,7 +67,7 @@ export function AiAdministrationPage() {
       <AccessDenied
         title="AI"
         why="This screen discloses what every caller has asked the tools to do, which is its own power."
-        permissions={["ai:read"]}
+        permissions={requiredPermissionsOf(AI)}
       />
     )
   }

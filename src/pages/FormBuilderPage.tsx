@@ -6,12 +6,12 @@ import { useForm } from "@/hooks/useForms"
 import { describeQueryFailure } from "@/lib/loadFailure"
 
 /**
- * The form builder, filling the frame.
+ * The form builder — an ordinary screen, like every other one.
  *
- * ⚠️ **`h-full` rather than `flex-1`, and it needs the layout's scroller to be bounded.** The builder is
- * a three-column workbench whose columns scroll independently; the moment its own height is allowed to
- * grow, the *page* scrolls instead and the field list leaves the top of the window while somebody edits
- * a long field. `ApplicationLayout` caps the frame at `h-svh` — that is what makes this line work.
+ * ⚠️ **It used to be a workbench in a bordered box that filled the frame**, with three columns
+ * scrolling independently and a header of its own invention. That is gone (Ivan, 2026-08-25: *«лейаут
+ * не в загальному стилі»*): the builder carries the standard `PageHeader`, its questions flow in the
+ * layout's own scroller, and the preview column that forced the shape is a button now.
  */
 export function FormBuilderPage() {
   const { formId } = useParams()
@@ -34,9 +34,5 @@ export function FormBuilderPage() {
     )
   }
 
-  return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border">
-      <FormBuilder form={query.data} />
-    </div>
-  )
+  return <FormBuilder form={query.data} />
 }

@@ -1,23 +1,17 @@
 import { useMemo, useState } from "react"
+import { Link, useNavigate, useParams } from "react-router-dom"
 import { toast } from "sonner"
-import {
-  Badge,
-  Button,
-  type FilterItem,
-  FilterPanel,
-  Input,
-  Row,
-  RowGroup,
-  RowList,
-  RowMeta,
-  RowTitle,
-  Skeleton,
-} from "@jmouse/ui"
+import { ExternalLink } from "lucide-react"
+import { Badge, Button, type FilterItem, FilterPanel, Input, RowGroup, Skeleton } from "@jmouse/ui"
 import { PageHeader } from "@/components/PageHeader"
 import { CreateFieldDialog } from "@/components/form/CreateFieldDialog"
-import { FieldEditorSheet } from "@/components/form/FieldEditorSheet"
+import { ChildPickerDialog } from "@/components/form/builder/ChildPickerDialog"
+import { FieldCard } from "@/components/form/builder/FieldCard"
+import { FieldEditor } from "@/components/form/builder/FieldEditor"
 import { USAGE_TYPES } from "@/lib/fieldTypes"
 import { useDeleteField, useEntityIdsByTag, useFields, useTagStats } from "@/hooks/useFieldCatalogue"
+import { useIsWideLayout } from "@/hooks/useMediaQuery"
+import { spaceSectionPath } from "@/lib/navigationContext"
 import { FIELD_TYPES, fieldTypeOf } from "@/lib/fieldTypes"
 import type { ElementType, FieldSummary } from "@/types"
 
@@ -41,10 +35,19 @@ const TAG_PREFIX = "tag:"
  * the whole reason this screen exists apart from the builder, and why the count beside a type here is a
  * count of *definitions*, never of the times one is used.
  *
- * ⚠️ **Rows rather than cards**, unlike the component types: this list is scanned for one name among two
- * hundred, and the thing being compared down the column is the identifier a form will refer to.
+ * ⚠️ **A row opens where it stands** (Ivan, 2026-08-25), instead of throwing a sheet over the list. The
+ * catalogue is scanned for one field among two hundred, and a sheet covered the very column somebody had
+ * just been reading down — so every edit ended with the list having to be found again. It is the same
+ * editor the builder expands, in the same variant.
+ *
+ * ⚠️ **Below `lg` a row does not expand — it navigates.** Two cards side by side need a screen, and a
+ * phone has the field's own page instead, which is a better destination anyway: it survives a reload and
+ * can be sent to somebody.
  */
 export function FieldsPage() {
+  const { spaceSlug } = useParams()
+  const navigate = useNavigate()
+  const isWide = useIsWideLayout()
   const { data: fields = [], isLoading } = useFields()
   const { data: tagStats = [] } = useTagStats("FIELD")
 
@@ -52,7 +55,8 @@ export function FieldsPage() {
   const [activeKey, setActiveKey] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [removingId, setRemovingId] = useState<string | null>(null)
-  const [editingId, setEditingId] = useState<string | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [isPickingChild, setPickingChild] = useState(false)
 
   const deleteField = useDeleteField()
 
@@ -99,6 +103,34 @@ export function FieldsPage() {
           needle === "" || field.label.toLowerCase().includes(needle) || field.name.toLowerCase().includes(needle),
       )
   }, [fields, activeUsage, activeElement, activeTagId, taggedIds, search])
+
+  function fieldPath(fieldId: string) {
+    return spaceSectionPath(spaceSlug ?? "", `fields/${fieldId}`)
+  }
+
+  function onToggle(field: FieldSummary) {
+    if (!isWide) {
+      navigate(fieldPath(field.id))
+      return
+    }
+
+    setExpandedId((previous) => (previous === field.id ? null : field.id))
+  }
+
+  function onRemove(field: FieldSummary) {
+    deleteField.mutate(field.id, {
+      onSuccess: () => toast.success(`${field.label} deleted.`),
+      onError: (error) => {
+        const detail = (error as { response?: { data?: { detail?: string } } }).response?.data?.detail
+
+        // ⚠️ The backend's own sentence. "Could not delete" hides the one useful fact — that a form
+        // still carries it — and sends somebody looking at permissions.
+        toast.error(detail ?? "Could not delete this field.")
+      },
+    })
+
+    setRemovingId(null)
+  }
 
   return (
     <>
@@ -150,30 +182,58 @@ export function FieldsPage() {
             </div>
           ) : (
             <RowGroup tally={`${visible.length} of ${fields.length}`}>
-              <RowList>
+              <div className="flex flex-col gap-1.5">
                 {visible.map((field) => (
-                  <FieldRow
+                  <FieldCard
                     key={field.id}
                     field={field}
-                    onOpen={() => setEditingId(field.id)}
-                    removing={removingId === field.id}
-                    onAskRemove={() => setRemovingId(field.id)}
-                    onRemove={() => {
-                      deleteField.mutate(field.id, {
-                        onSuccess: () => toast.success(`${field.label} deleted.`),
-                        onError: (error) => {
-                          const detail = (error as { response?: { data?: { detail?: string } } }).response?.data?.detail
+                    isExpanded={expandedId === field.id}
+                    onToggle={() => onToggle(field)}
+                    badges={<CatalogueBadges field={field} />}
+                    actions={
+                      <>
+                        <Button asChild variant="ghost" size="icon" className="size-6" aria-label="Open as a page">
+                          <Link to={fieldPath(field.id)} onClick={(event) => event.stopPropagation()}>
+                            <ExternalLink className="size-3" />
+                          </Link>
+                        </Button>
 
-                          // ⚠️ The backend's own sentence. "Could not delete" hides the one useful fact —
-                          // that a form still carries it — and sends somebody looking at permissions.
-                          toast.error(detail ?? "Could not delete this field.")
-                        },
-                      })
-                      setRemovingId(null)
-                    }}
-                  />
+                        {removingId === field.id ? (
+                          <Button variant="destructive" size="sm" onClick={() => onRemove(field)}>
+                            Really delete
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:bg-destructive/10"
+                            onClick={() => setRemovingId(field.id)}
+                          >
+                            Delete
+                          </Button>
+                        )}
+                      </>
+                    }
+                  >
+                    {/* ⚠️ No `form`, so no *Condition* card — a condition names sibling fields, and a
+                        catalogued field has none. Everything else a field owns is editable here. */}
+                    <FieldEditor
+                      fieldId={field.id}
+                      variant="inline"
+                      onPickChild={() => setPickingChild(true)}
+                      onClose={() => setExpandedId(null)}
+                      actions={
+                        <Button asChild variant="ghost" size="sm">
+                          <Link to={fieldPath(field.id)}>
+                            <ExternalLink className="size-3.5" />
+                            Open as a page
+                          </Link>
+                        </Button>
+                      }
+                    />
+                  </FieldCard>
                 ))}
-              </RowList>
+              </div>
             </RowGroup>
           )}
         </div>
@@ -181,71 +241,25 @@ export function FieldsPage() {
 
       {creating && <CreateFieldDialog onClose={() => setCreating(false)} />}
 
-      {/* ⚠️ Keyed on the field so switching rows remounts the editor rather than reusing its draft —
-          otherwise an unsaved change would follow the reader onto the next field. */}
-      {editingId && <FieldEditorSheet key={editingId} fieldId={editingId} onClose={() => setEditingId(null)} />}
+      <ChildPickerDialog fieldId={expandedId} open={isPickingChild} onClose={() => setPickingChild(false)} />
     </>
   )
 }
 
-function FieldRow({
-  field,
-  onOpen,
-  removing,
-  onAskRemove,
-  onRemove,
-}: {
-  field: FieldSummary
-  onOpen: () => void
-  removing: boolean
-  onAskRemove: () => void
-  onRemove: () => void
-}) {
+/** What a field is, read without opening it — the type, its unit, and how it may be used. */
+function CatalogueBadges({ field }: { field: FieldSummary }) {
   const descriptor = fieldTypeOf(field.elementType as ElementType)
   const usage = USAGE_TYPES.find((candidate) => candidate.value === field.usageType)
 
   return (
-    <Row
-      onOpen={onOpen}
-      leading={
-        <>
-          <span aria-hidden="true" className="w-4 text-center" title={descriptor.label}>
-            {field.icon ?? descriptor.glyph}
-          </span>
-        </>
-      }
-      trailing={
-        <>
-          {field.required && <Badge variant="outline">required</Badge>}
-          {field.unit && <Badge variant="secondary">{field.unit}</Badge>}
-          <Badge variant="secondary">{descriptor.label}</Badge>
-          {usage && usage.value !== "STANDALONE" && (
-            <Badge variant="outline" title={usage.hint}>
-              {usage.glyph} {usage.label}
-            </Badge>
-          )}
-
-          {removing ? (
-            <Button variant="destructive" size="sm" onClick={onRemove}>
-              Really delete
-            </Button>
-          ) : (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-destructive opacity-0 transition-opacity group-hover/row:opacity-100 hover:bg-destructive/10"
-              onClick={onAskRemove}
-            >
-              Delete
-            </Button>
-          )}
-        </>
-      }
-    >
-      <RowTitle>{field.label}</RowTitle>
-      {/* ⚠️ The name, always — it is what a form refers to and what an expression is written against, and
-          a catalogue that showed only labels would be unusable the moment two fields read alike. */}
-      <RowMeta className="font-mono">{field.name}</RowMeta>
-    </Row>
+    <>
+      {field.unit && <Badge variant="secondary">{field.unit}</Badge>}
+      <Badge variant="secondary">{descriptor.label}</Badge>
+      {usage && usage.value !== "STANDALONE" && (
+        <Badge variant="outline" title={usage.hint}>
+          {usage.glyph} {usage.label}
+        </Badge>
+      )}
+    </>
   )
 }

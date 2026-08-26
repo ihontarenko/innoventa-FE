@@ -1,10 +1,12 @@
 import { useRef, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { toast } from "sonner"
+import { Search } from "lucide-react"
 import { Button, Skeleton } from "@jmouse/ui"
 import { PageHeader } from "@/components/PageHeader"
 import { DynamicForm } from "@/components/form/DynamicForm"
 import { EntryRecord } from "@/components/form/EntryRecord"
+import { EntryLookupDialog } from "@/components/lookup/EntryLookupDialog"
 import { useForm } from "@/hooks/useForms"
 import { useDeleteEntry, useEntry, useUpdateEntry } from "@/hooks/useWorkspaceForms"
 import { LabelPrintButton } from "@/components/labels/LabelPrintButton"
@@ -34,7 +36,16 @@ export function EntryPage() {
 
   const [editing, setEditing] = useState(false)
   const [confirmingRemoval, setConfirmingRemoval] = useState(false)
+  const [isLookingUp, setLookingUp] = useState(false)
   const formRef = useRef<HTMLFormElement | null>(null)
+
+  /**
+   * ⚠️ **Offered here for the same reason it is offered in the drawer, and by the same test.** Somebody
+   * who arrived at this address from a search hit or a pasted link is looking at exactly the row a
+   * lookup would fill; sending them back to a list to open the drawer over the same record was the only
+   * thing that ever made this page the lesser of the two.
+   */
+  const canLookUp = form?.purpose?.code === "INVENTORY" || form?.purpose?.code === "CATALOG"
 
   if (formLoading || entryLoading) {
     return (
@@ -127,6 +138,14 @@ export function EntryPage() {
                 </Button>
               )}
 
+              {/* ⚠️ Offered on a part, whatever its type maps — see `canLookUp`. */}
+              {canLookUp && (
+                <Button variant="outline" size="sm" onClick={() => setLookingUp(true)}>
+                  <Search className="size-3.5" />
+                  Look up
+                </Button>
+              )}
+
               <Button size="sm" onClick={() => setEditing(true)}>
                 Edit
               </Button>
@@ -153,6 +172,21 @@ export function EntryPage() {
           <EntryRecord form={form} entry={entry} />
         )}
       </div>
+
+      {/* ⚠️ Applying writes through the same update call an edit does — one write path, so a value taken
+          from a distributor is validated exactly as a typed one is. */}
+      {isLookingUp && (
+        <EntryLookupDialog
+          entry={entry}
+          form={form}
+          isSaving={updateEntry.isPending}
+          onApply={async (fieldValues) => {
+            await updateEntry.mutateAsync({ formId: form.id, entryId: entry.id, fieldValues })
+            setLookingUp(false)
+          }}
+          onClose={() => setLookingUp(false)}
+        />
+      )}
     </>
   )
 }

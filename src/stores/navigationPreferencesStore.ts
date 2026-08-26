@@ -1,7 +1,7 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import { authApi } from "@/api/auth"
-import { navigationItems } from "@/navigation"
+import { navigationItems, platformSections } from "@/navigation"
 
 /**
  * Navigation personalisation — server-persisted, and scoped to where each item lives.
@@ -67,8 +67,55 @@ interface NavigationPreferencesState {
 
 const EMPTY_PREFERENCES: NavigationPreferences = { inherited: [], scopes: {} }
 
-/** Every item reachable outside a workspace — read off the navigation rather than listed twice. */
+/**
+ * Every destination reachable outside a workspace — the sidebar's rows, both screens' entries and the
+ * manual, read off the navigation rather than listed twice.
+ *
+ * ⚠️ **Deliberately the BROAD set, and only `splitFlatPreference` uses it.** Its job is telling a
+ * platform key apart from a workspace one when the old flat array is carried across; a narrower set
+ * would push `mapping-builder` and `ui-kit` into `inherited`, which is the default *every workspace*
+ * starts from — one moved menu row would have hidden things in workspaces that never heard of it.
+ */
 const PLATFORM_ITEM_KEYS = new Set(navigationItems.map((item) => item.key))
+
+/**
+ * The keys the platform sidebar can actually draw — its rows, and nothing else.
+ *
+ * ⚠️ **Narrower than the set above, and the difference is the whole of this file's cleanup.** A
+ * destination that stops being a sidebar row is no longer something a person can choose to hide, so a
+ * preference naming it describes a row that does not exist. It hides nothing and breaks nothing; it
+ * simply accumulates, and the day somebody debugs a menu they will find keys nothing renders.
+ */
+const PERSONALISABLE_PLATFORM_KEYS = new Set(
+  platformSections.flatMap((section) => section.items).map((item) => item.key),
+)
+
+/**
+ * The platform bucket, with keys no sidebar row answers to dropped — or the same object when there is
+ * nothing to drop.
+ *
+ * ⚠️ **Identity is the signal**, so the caller can tell "already clean" from "cleaned" and write back
+ * only in the second case. A save on every hydrate would be a request per sign-in that changes nothing.
+ *
+ * ⚠️ **The platform bucket ONLY.** A workspace's menu is served, so which keys it has is not a fact
+ * this file holds — pruning one against a list the browser invented would delete a preference for a row
+ * the server does draw.
+ */
+function withoutRetiredPlatformKeys(preferences: NavigationPreferences): NavigationPreferences {
+  const bucket = preferences.scopes[PLATFORM_SCOPE]
+
+  if (!bucket) {
+    return preferences
+  }
+
+  const kept = bucket.filter((itemKey) => PERSONALISABLE_PLATFORM_KEYS.has(itemKey))
+
+  if (kept.length === bucket.length) {
+    return preferences
+  }
+
+  return { ...preferences, scopes: { ...preferences.scopes, [PLATFORM_SCOPE]: kept } }
+}
 
 /**
  * ⚠️ **Debounced, because a toggle is a click and a write is a request.** Somebody tidying their
@@ -157,7 +204,16 @@ export const useNavigationPreferencesStore = create<NavigationPreferencesState>(
         const scoped = parseNavigationPreferences(serverPreferences?.[SCOPED_PREFERENCE_KEY])
 
         if (scoped) {
-          set({ preferences: scoped, hydrated: true })
+          const pruned = withoutRetiredPlatformKeys(scoped)
+
+          set({ preferences: pruned, hydrated: true })
+
+          // Written back only when something was actually dropped, so this branch is taken once per
+          // account and then never again.
+          if (pruned !== scoped) {
+            scheduleSave(pruned)
+          }
+
           return
         }
 
@@ -172,7 +228,10 @@ export const useNavigationPreferencesStore = create<NavigationPreferencesState>(
         })()
 
         if (flat) {
-          const preferences = splitFlatPreference(flat)
+          // ⚠️ Split first, prune after — in that order. The split needs the BROAD platform set to tell
+          // a platform key from a workspace one; pruning is about what the sidebar can draw, and asking
+          // the narrow set first would file `ui-kit` under `inherited` and hide things in workspaces.
+          const preferences = withoutRetiredPlatformKeys(splitFlatPreference(flat))
 
           set({ preferences, hydrated: true })
           scheduleSave(preferences)

@@ -6,6 +6,7 @@ import { hasNamedSections, sectionsOf, WIDTH_CLASS, widthOf } from "@/lib/formLa
 import { fieldErrorsOf, withoutHiddenValues, withoutPhantomValues } from "@/lib/formValues"
 import { FieldRow } from "./FieldRow"
 import { VirtualFieldGroup } from "./VirtualFieldGroup"
+import { UploadDestinationProvider, uploadRootFor } from "./UploadDestination"
 
 interface DynamicFormProperties {
   form: FormDetail
@@ -95,6 +96,14 @@ export function DynamicForm({
   const titled = hasNamedSections(sections)
 
   return (
+    /*
+      ⚠️ **Where the files attached here belong, decided once for the whole form.** A file control is
+      rendered by the control registry, which knows a field's type and nothing about what the form is
+      for — so the destination arrives as context rather than as a prop threaded through it.
+
+      ⚠️ By the form's PURPOSE, never by its id: a workspace has as many inventory forms as it likes.
+    */
+    <UploadDestinationProvider rootName={uploadRootFor(form.purpose?.code)}>
     <form onSubmit={handleSubmit} ref={formRef} className="flex flex-col gap-4">
       {submitError && (
         <Alert variant="destructive">
@@ -173,5 +182,6 @@ export function DynamicForm({
         </div>
       )}
     </form>
+    </UploadDestinationProvider>
   )
 }

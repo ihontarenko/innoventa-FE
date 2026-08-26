@@ -1,46 +1,49 @@
 import { useState } from "react"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { Eye, EyeOff, Settings2 } from "lucide-react"
-import { Button, Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, cn } from "@jmouse/ui"
+import { Link, useParams } from "react-router-dom"
+import { ExternalLink, Eye, SlidersHorizontal } from "lucide-react"
+import { Badge, Button, Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@jmouse/ui"
 import type { FieldSummary, FormDetail } from "@/types"
-import { fieldsApi } from "@/api/fields"
-import { useAttachField, useField } from "@/hooks/useForms"
+import { PageHeader } from "@/components/PageHeader"
+import { FormManagementDialog } from "@/components/form/FormManagementDialog"
+import { FormPreviewDialog } from "@/components/form/FormPreviewDialog"
+import { spaceSectionPath } from "@/lib/navigationContext"
+import { useAttachField } from "@/hooks/useForms"
 import { useIsWideLayout } from "@/hooks/useMediaQuery"
+import { ChildPickerDialog } from "./ChildPickerDialog"
 import { FieldEditor } from "./FieldEditor"
 import { FieldPickerDialog } from "./FieldPickerDialog"
-import { FormPreview } from "./FormPreview"
-import { FormSettingsSheet } from "./FormSettingsSheet"
-import { SchemaList } from "./SchemaList"
+import { FormCanvas } from "./FormCanvas"
 
 /**
- * Building a form: the schema on the left, one field on the right, and the form itself beside them.
+ * Building a form: the questions it asks, in order, each opening where it stands.
  *
- * ⚠️ **Two panes rather than a list that swells.** The old builder expanded the row you were reading
- * into a five-tab panel, so the list you were navigating by moved under you every time you opened
- * something. Nothing in the left column ever changes height here.
+ * ⚠️ **An ordinary screen now, with the ordinary `PageHeader`** (Ivan, 2026-08-25: *«лейаут не в
+ * загальному стилі»*). It used to be a workbench in a bordered box with a header of its own invention,
+ * so the one screen somebody spends the most time in was the one screen that looked like nowhere else in
+ * the product — and the same view rendered inside other content sat visibly at the wrong altitude.
  *
- * ⚠️ **Narrow screens get the same editor as a sheet**, not a second layout. One component, one set of
- * behaviours; a phone-shaped copy of a field editor is a phone-shaped copy of every bug in it.
+ * ⚠️ **No preview pane** (Ivan, 2026-08-25: *«превью теж просив прибрати і зробити кнопку»*). It is a
+ * button, and the window it opens is the same `DynamicForm` the pane drew. The column it was taking is
+ * the column the questions now have.
+ *
+ * ⚠️ **Settings opens the management screen, not a sheet of its own.** There is one place a form's
+ * name, reach, placement, widgets and configuration are edited, and the builder opens it at the **base**
+ * level — see `ManagementDepth` for why the deepest screen is not the deepest level.
+ *
+ * ⚠️ **Narrow screens get the field editor as a sheet, not a squeezed card.** Two cards side by side
+ * need a screen; one component either way, because a phone-shaped copy of a field editor is a
+ * phone-shaped copy of every bug in it.
  */
 export function FormBuilder({ form }: { form: FormDetail }) {
-  const queryClient = useQueryClient()
-  const [selectedFieldId, setSelectedFieldId] = useState<string | null>(form.fields[0]?.id ?? null)
+  const { spaceSlug } = useParams()
+  const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null)
   const [isAttaching, setAttaching] = useState(false)
   const [isPickingChild, setPickingChild] = useState(false)
-  const [showPreview, setShowPreview] = useState(true)
-  const [showSettings, setShowSettings] = useState(false)
+  const [isPreviewOpen, setPreviewOpen] = useState(false)
+  const [isManaging, setManaging] = useState(false)
   const isWide = useIsWideLayout()
 
   const attachField = useAttachField(form.id)
-  const { data: selectedDetail } = useField(selectedFieldId ?? undefined)
-
-  const addChild = useMutation({
-    mutationFn: (childFieldId: string) => fieldsApi.addChild(selectedFieldId!, childFieldId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["fields", selectedFieldId] })
-      queryClient.invalidateQueries({ queryKey: ["forms"] })
-    },
-  })
 
   async function onAttach(field: FieldSummary) {
     await attachField.mutateAsync(field.id)
@@ -48,81 +51,92 @@ export function FormBuilder({ form }: { form: FormDetail }) {
     setAttaching(false)
   }
 
-  const condition = selectedFieldId ? (form.fieldConditions?.[selectedFieldId] ?? null) : null
+  function conditionOf(fieldId: string) {
+    return form.fieldConditions?.[fieldId] ?? null
+  }
+
+  /** The field's own address — a link out of the builder, and the only door on a phone. */
+  function fieldPath(fieldId: string) {
+    return spaceSectionPath(spaceSlug ?? "", `fields/${fieldId}`)
+  }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <header className="flex items-center gap-2 border-b px-4 py-2.5">
-        <h1 className="truncate text-sm font-semibold">
-          {form.icon && <span className="mr-1.5">{form.icon}</span>}
-          {form.name}
-        </h1>
-        {form.codename && <span className="truncate font-mono text-xs text-muted-foreground">{form.codename}</span>}
+    <>
+      <PageHeader
+        title={`${form.icon ?? "▤"} ${form.name}`}
+        description={
+          <span className="flex flex-wrap items-center gap-2">
+            {form.codename && <span className="font-mono">{form.codename}</span>}
+            {form.purpose && <Badge variant="secondary">{form.purpose.label}</Badge>}
+            {form.category && <Badge variant="outline">{form.category.name}</Badge>}
+            <span>the questions it asks, and the order it asks them in</span>
+          </span>
+        }
+        actions={
+          <>
+            <Button variant="ghost" size="sm" onClick={() => setPreviewOpen(true)}>
+              <Eye className="size-3.5" />
+              Preview
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setManaging(true)}>
+              <SlidersHorizontal className="size-3.5" />
+              Settings
+            </Button>
+          </>
+        }
+      />
 
-        <div className="ml-auto flex gap-1">
-          <Button type="button" variant="ghost" size="sm" onClick={() => setShowPreview((previous) => !previous)}>
-            {showPreview ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-            Preview
-          </Button>
-          {/* The form's own settings are read rarely and edited rarely — a sheet, not a third column
-              competing for width with the work (Ivan, 2026-08-19). */}
-          <Button type="button" variant="ghost" size="sm" onClick={() => setShowSettings(true)}>
-            <Settings2 className="size-3.5" />
-            Settings
-          </Button>
-        </div>
-      </header>
-
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[18rem_minmax(0,1fr)] xl:grid-cols-[18rem_minmax(0,1fr)_22rem]">
-        <div className="min-h-0 border-r">
-          <SchemaList
+      <FormCanvas
+        form={form}
+        expandedFieldId={isWide ? selectedFieldId : null}
+        onExpand={setSelectedFieldId}
+        onAttach={() => setAttaching(true)}
+        renderEditor={(field) => (
+          <FieldEditor
             form={form}
-            selectedFieldId={selectedFieldId}
-            onSelect={setSelectedFieldId}
-            onAttach={() => setAttaching(true)}
+            fieldId={field.id}
+            condition={conditionOf(field.id)}
+            variant="inline"
+            onPickChild={() => setPickingChild(true)}
+            onClose={() => setSelectedFieldId(null)}
+            actions={
+              <Button asChild variant="ghost" size="sm">
+                <Link to={fieldPath(field.id)}>
+                  <ExternalLink className="size-3.5" />
+                  Open as a page
+                </Link>
+              </Button>
+            }
           />
-        </div>
+        )}
+      />
 
-        {/* Below `lg` the editor is a sheet instead — see the same component rendered twice below. */}
-        <div className="hidden min-h-0 lg:flex lg:flex-col">
-          {selectedFieldId ? (
-            <FieldEditor
-              form={form}
-              fieldId={selectedFieldId}
-              condition={condition}
-              onPickChild={() => setPickingChild(true)}
-            />
-          ) : (
-            <p className="p-6 text-sm text-muted-foreground">Pick a field on the left, or attach one.</p>
-          )}
-        </div>
-
-        <div className={cn("min-h-0 border-l", showPreview ? "hidden xl:flex xl:flex-col" : "hidden")}>
-          <FormPreview form={form} />
-        </div>
-      </div>
-
-      <Sheet
-        open={!!selectedFieldId && !isWide}
-        onOpenChange={(next) => !next && setSelectedFieldId(null)}
-      >
-        <SheetContent side="right" className="flex w-full max-w-md flex-col p-0 lg:hidden">
+      {/* ⚠️ Below `lg` only. The same editor, and the same draft rules — see the note on the component. */}
+      <Sheet open={!!selectedFieldId && !isWide} onOpenChange={(next) => !next && setSelectedFieldId(null)}>
+        <SheetContent side="right" className="flex w-full max-w-md flex-col gap-0 p-0 lg:hidden">
           <SheetHeader className="sr-only">
             <SheetTitle>Edit field</SheetTitle>
-            <SheetDescription>The same editor the wide layout shows beside the list.</SheetDescription>
+            <SheetDescription>The same editor a wide screen opens inside the row.</SheetDescription>
           </SheetHeader>
           {selectedFieldId && (
             <FieldEditor
               form={form}
               fieldId={selectedFieldId}
-              condition={condition}
+              condition={conditionOf(selectedFieldId)}
+              variant="panel"
               onPickChild={() => setPickingChild(true)}
+              actions={
+                <Button asChild variant="ghost" size="sm">
+                  <Link to={fieldPath(selectedFieldId)}>
+                    <ExternalLink className="size-3.5" />
+                    Page
+                  </Link>
+                </Button>
+              }
             />
           )}
         </SheetContent>
       </Sheet>
-
-      <FormSettingsSheet form={form} open={showSettings} onClose={() => setShowSettings(false)} />
 
       <FieldPickerDialog
         open={isAttaching}
@@ -132,19 +146,15 @@ export function FormBuilder({ form }: { form: FormDetail }) {
         onClose={() => setAttaching(false)}
       />
 
-      <FieldPickerDialog
-        open={isPickingChild}
-        title="Add a child field"
-        excludedFieldIds={[
-          ...(selectedDetail?.children ?? []).map((child) => child.id),
-          ...(selectedFieldId ? [selectedFieldId] : []),
-        ]}
-        onPick={async (field) => {
-          await addChild.mutateAsync(field.id)
-          setPickingChild(false)
-        }}
-        onClose={() => setPickingChild(false)}
-      />
-    </div>
+      <ChildPickerDialog fieldId={selectedFieldId} open={isPickingChild} onClose={() => setPickingChild(false)} />
+
+      {isPreviewOpen && <FormPreviewDialog formId={form.id} onClose={() => setPreviewOpen(false)} />}
+
+      {/* ⚠️ **`base`, and this is the levels rule, not an oversight** (Ivan, 2026-08-25). The builder is
+          reached from the form library, which is the platform's base and knows nothing about stock or
+          distributors — so no subject-area configuration appears here however much detail is to hand.
+          `stock.*` and `pricing.*` are edited on Component types, the level that owns them. */}
+      {isManaging && <FormManagementDialog form={form} onClose={() => setManaging(false)} />}
+    </>
   )
 }

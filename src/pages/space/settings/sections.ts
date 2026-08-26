@@ -4,6 +4,7 @@ import { IdentitySection } from "./IdentitySection"
 import { MembersSection } from "./MembersSection"
 import { WordsSection } from "./WordsSection"
 import { ModulesSection } from "./ModulesSection"
+import { KiCadSection } from "./KiCadSection"
 import type { SpaceSettingsSection } from "./SpaceSettingsSection"
 
 /**
@@ -42,6 +43,17 @@ export const SPACE_SETTINGS_SECTIONS: SpaceSettingsSection[] = [
     module: "forms",
     visible: (context) => context.isAdmin,
     Component: FormsSection,
+  },
+
+  // ⚠️ Bound to the catalogues module: a credential here reads the parts catalogue, so a workspace
+  // without it has nothing to connect an editor to. No `visible` gate — a member who cannot issue one
+  // still needs to see which machines are connected, and the controls disable instead.
+  {
+    key: "kicad",
+    label: "KiCad",
+    glyph: "◪",
+    module: "parts-catalog",
+    Component: KiCadSection,
   },
 
   { key: "danger-zone", label: "Danger zone", glyph: "⊗", Component: DangerZoneSection },

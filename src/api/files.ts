@@ -1,4 +1,5 @@
-import { createApiClient } from "./http"
+import { createApiClient, http as platformHttp } from "./http"
+import { LIBRARY_ROUTES } from "./libraryRoutes"
 
 /**
  * ⚠️ **The LIBRARY's base path, not Innoventa's `/api`** (`UIK-8`). Files and the directory tree are
@@ -9,7 +10,7 @@ import { createApiClient } from "./http"
  * proxy entry, and this line. When they drift every call 404s and the manager reads as an account with
  * no files. Change one, change three.
  */
-const http = createApiClient("/jmouse-files/api")
+const http = createApiClient(LIBRARY_ROUTES.files)
 
 /**
  * A file, as the shared file library describes one.
@@ -55,8 +56,13 @@ export const fileLinks = {
  * by length is exactly what once blanked every image preview in the product. Prose that happens to
  * contain a colon (`"Note: see the datasheet"`) does not match, which is what makes this safe to run
  * over a value whose field type is unknown.
+ *
+ * ⚠️ **An extension may hold an underscore.** `.kicad_sym` and `.kicad_mod` are the two most common files
+ * in the CAD catalogue, and a class of letters and digits alone rejects both — the value then fails to
+ * parse, and every screen falls back to printing the raw `token:filename` at whoever opened it. A parse
+ * that fails is not visible as a failure anywhere; it renders as an identifier where a name should be.
  */
-const FILE_FIELD_VALUE = /^([A-Za-z0-9._~-]{4,}):([^\s\\/:*?"<>|][^\\/:*?"<>|]*\.[A-Za-z0-9]{1,12})$/
+const FILE_FIELD_VALUE = /^([A-Za-z0-9._~-]{4,}):([^\s\\/:*?"<>|][^\\/:*?"<>|]*\.[A-Za-z0-9_]{1,12})$/
 
 export interface FileFieldValue {
   viewToken: string
@@ -93,6 +99,25 @@ export const filesApi = {
   list: (owner: string) => http.get<ManagedFile[]>("/files", { params: { owner } }),
 
   read: (fileId: string) => http.get<ManagedFile>(`/files/${fileId}`),
+
+  /**
+   * Which folder a given kind of file belongs in — `files`, `inventory`, `cad`.
+   *
+   * ⚠️ **A folder INSIDE the cabinet, not a root beside it.** The file manager opens at the cabinet and
+   * reads down from it, so a sibling root is a folder nobody can see — and filing into an invisible
+   * place is worse than the untidy cabinet it was meant to fix.
+   *
+   * ⚠️ **`platformHttp`, not the `http` above.** Everything else in this module is the storage library's
+   * and lives under its own prefix; *which root a feature files into* is this product's decision and
+   * therefore this product's route. Sent through the library client it would 404, and a 404 here reads
+   * as "this account has no such folder" rather than as an address nobody serves.
+   *
+   * ⚠️ **The server creates it on first ask**, so this is a write the first time and a read forever
+   * after. It is asked when something is about to be filed, never on sign-in: provisioning every root
+   * for every account would make folders for people who will never upload a footprint.
+   */
+  folder: (name: string) =>
+    platformHttp.get<{ id: string; path: string }>(`/file-folders/${name}`),
 
   /**
    * The bytes themselves, for anything that has to draw them.
@@ -190,17 +215,24 @@ export const directoriesApi = {
 /**
  * Public links, which belong to the Sharing Center rather than to any one kind of thing.
  *
+ * ⚠️ **`platformHttp`, NOT the library client this file otherwise uses, and that is the whole bug this
+ * comment exists to prevent.** These three routes are `ShareTokenController`'s, under Innoventa's own
+ * `/api` — a share is a Sharing Center row that happens to point at a file, and the file library has no
+ * notion of one. Written with the client at the top of this module they resolve to
+ * `/jmouse/files/api/share/tokens`, which nothing serves: every file field then renders *No endpoint
+ * exists at …* in place of its picker.
+ *
  * ⚠️ **Ask for a whole page's tokens at once.** One request per row is a request per file on the screen
  * that has the most of them.
  */
 export const shareApi = {
   tokens: (entityType: string, ids: string[]) =>
-    http.get<Record<string, string>>("/share/tokens", { params: { entityType, ids } }),
+    platformHttp.get<Record<string, string>>("/share/tokens", { params: { entityType, ids } }),
 
   rotate: (entityType: string, entityId: string) =>
-    http.post<{ token: string }>(`/share/${entityType}/${entityId}/rotate`),
+    platformHttp.post<{ token: string }>(`/share/${entityType}/${entityId}/rotate`),
 
-  revoke: (entityType: string, entityId: string) => http.delete(`/share/${entityType}/${entityId}`),
+  revoke: (entityType: string, entityId: string) => platformHttp.delete(`/share/${entityType}/${entityId}`),
 }
 
 // ⚠️ The installation's public settings used to be a second `configApi` here, over the same `/config`

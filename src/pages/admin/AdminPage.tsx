@@ -50,6 +50,7 @@ import {
 } from "@/hooks/useAdministration"
 import { useDebouncedValue } from "@/hooks/useDebouncedValue"
 import { useAuthStore } from "@/stores/authStore"
+import { platformItem, requiredPermissionsOf } from "@/navigation"
 import { readableDate } from "@/lib/dates"
 import { isClientAccount, type AccountKind, type AdminUser, type PermissionEffect, type RoleView } from "@/api/admin"
 
@@ -57,6 +58,9 @@ type Tab = "users" | "roles" | "permissions"
 
 /** The roles the application ships with — they cannot be deleted, however a screen feels about it. */
 const BUILT_IN_ROLES = new Set(["GLOBAL_ADMIN", "GLOBAL_MANAGER", "GLOBAL_MEMBER", "GLOBAL_BOOTSTRAP", "GLOBAL_GOD"])
+
+/** The declaration this screen is reached by — asked, never re-typed. See `AccessRequirement`. */
+const USERS = platformItem("admin-users")
 
 /**
  * Accounts, roles and the permission catalogue.
@@ -76,18 +80,18 @@ export function AdminPage() {
    * the installation, and the coarse "holds it somewhere" answer would open it to anybody granted the
    * permission in one workspace.
    */
-  const holdsEverywhere = useAuthStore((state) => state.holdsEverywhere)
+  const mayOpen = useAuthStore((state) => state.holds)
 
   const [activeTab, setActiveTab] = useState<Tab>("users")
   const [creatingUser, setCreatingUser] = useState(false)
   const [creatingRole, setCreatingRole] = useState(false)
 
-  if (!holdsEverywhere("user:read")) {
+  if (!mayOpen(USERS)) {
     return (
       <AccessDenied
         title="User management"
         why="User management reads and administers accounts across the whole installation, and this account has not been given that."
-        permissions={["user:read"]}
+        permissions={requiredPermissionsOf(USERS)}
       />
     )
   }

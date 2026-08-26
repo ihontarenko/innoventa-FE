@@ -13,7 +13,7 @@ import {
   DialogTitle,
   cn,
 } from "@jmouse/ui"
-import { jMouseEL } from "@/lib/codemirror"
+import { jmeSyntax } from "@/lib/codemirror"
 import { useCodeThemeExtensions } from "@jmouse/codemirror/react"
 import type { PolicyVocabularyView } from "@/api/policy"
 
@@ -99,7 +99,7 @@ function PolicyConditionDialog({
 
   const extensions = useMemo(
     () => [
-      jMouseEL(),
+      jmeSyntax(),
       ...codeThemeExtensions,
       EditorView.lineWrapping,
       autocompletion({ override: [(context) => complete(context, vocabulary)] }),

@@ -13,6 +13,7 @@ import {
   cn,
 } from "@jmouse/ui"
 import { BOUNDED_DIALOG, DialogBody } from "@/components/BoundedDialog"
+import { GlyphInput } from "@/components/GlyphInput"
 import { PlainSelect } from "@/components/access/PolicyEditingKit"
 import { useCreateField } from "@/hooks/useFieldCatalogue"
 import { toSnakeCase } from "@/components/form/builder/useFieldDraft"
@@ -93,15 +94,9 @@ export function CreateFieldDialog({ onClose }: { onClose: () => void }) {
 
         <DialogBody className="flex flex-col gap-3">
           <div className="flex gap-2">
-            <label className="flex w-20 flex-col gap-1">
+            <label className="flex flex-col gap-1">
               <span className="text-xs font-medium">Glyph</span>
-              <Input
-                className="h-8 text-center text-sm"
-                maxLength={2}
-                value={icon}
-                placeholder="⚡"
-                onChange={(event) => setIcon(event.target.value)}
-              />
+              <GlyphInput value={icon} onChange={setIcon} placeholder="⚡" />
             </label>
 
             <label className="flex flex-1 flex-col gap-1">

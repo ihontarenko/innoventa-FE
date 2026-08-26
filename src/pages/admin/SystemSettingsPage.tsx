@@ -7,6 +7,10 @@ import { PageHeader } from "@/components/PageHeader"
 import { PlainSelect } from "@/components/access/PolicyEditingKit"
 import { useBackendBuildInfo, useSystemSettings, useUpdateSystemSetting } from "@/hooks/useSystemSettings"
 import { useAuthStore } from "@/stores/authStore"
+import { platformItem, requiredPermissionsOf } from "@/navigation"
+
+/** The declaration this screen is reached by — asked, never re-typed. See `AccessRequirement`. */
+const SYSTEM_SETTINGS = platformItem("system-settings")
 import { groupHues } from "@/lib/groupHues"
 import { relativeTime } from "@/lib/dates"
 import type { SystemSetting } from "@/api/settings"
@@ -22,7 +26,7 @@ import type { SystemSetting } from "@/api/settings"
 export function SystemSettingsPage() {
   // The permission `SystemSettingsController` asks for, rather than the role that happens to bundle it —
   // a personal deny takes this away from an administrator, and must.
-  const holdsEverywhere = useAuthStore((state) => state.holdsEverywhere)
+  const mayOpen = useAuthStore((state) => state.holds)
 
   const { data: settings = [], isLoading } = useSystemSettings()
   const updateSetting = useUpdateSystemSetting()
@@ -56,12 +60,12 @@ export function SystemSettingsPage() {
     )
   }, [sorted, search])
 
-  if (!holdsEverywhere("settings:read")) {
+  if (!mayOpen(SYSTEM_SETTINGS)) {
     return (
       <AccessDenied
         title="System settings"
         why="System settings decide how the whole installation behaves — who may register, and how they sign in — so they are read over the installation rather than in a workspace."
-        permissions={["settings:read"]}
+        permissions={requiredPermissionsOf(SYSTEM_SETTINGS)}
       />
     )
   }

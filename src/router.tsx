@@ -14,6 +14,7 @@ import { AccessControlRoomPage } from "@/pages/admin/AccessControlRoomPage"
 import { AdminPage } from "@/pages/admin/AdminPage"
 import { AiAdministrationPage } from "@/pages/admin/ai/AiAdministrationPage"
 import { InvitationsPage } from "@/pages/admin/InvitationsPage"
+import { MappingBuilderPage } from "@/pages/admin/MappingBuilderPage"
 import { PlanAdministrationPage } from "@/pages/admin/PlanAdministrationPage"
 import { PurposesPage } from "@/pages/admin/PurposesPage"
 import { SharingPage } from "@/pages/admin/SharingPage"
@@ -46,6 +47,8 @@ import { WorkspaceSectionPage } from "@/pages/WorkspaceSectionPage"
 import { StationPage } from "@/pages/station/StationPage"
 import { StationsPage } from "@/pages/stations/StationsPage"
 import { CraftsPage } from "@/pages/admin/CraftsPage"
+import { NavigationScreenLayout } from "@/components/navigation/NavigationScreenLayout"
+import { NavigationScreenPage } from "@/components/navigation/NavigationScreenPage"
 import { SPACE_ROUTE_ROOT } from "@/lib/navigationContext"
 import { navigationItems } from "@/navigation"
 
@@ -125,24 +128,44 @@ export function ApplicationRoutes() {
           <Route path="/assistant" element={<AssistantPage />} />
           <Route path="/bug-report" element={<BugReportPage />} />
           <Route path="/stations" element={<StationsPage />} />
-          {/* ⚠️ No permission and no data — the kit renders itself, so it answers with the backend down. */}
-          <Route path="/ui-kit" element={<UiKitPage />} />
           <Route path="/settings/appearance" element={<AppearanceSettingsPage />} />
           {/* ⚠️ After the appearance route above: that one is a page of its own reachable from the user
               menu, and react-router picks the more specific path only if it is declared first. */}
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/settings/:tab" element={<SettingsPage />} />
-          <Route path="/admin/access" element={<AccessControlRoomPage />} />
-          <Route path="/admin/plans" element={<PlanAdministrationPage />} />
-          <Route path="/purposes" element={<PurposesPage />} />
-          <Route path="/admin/invitations" element={<InvitationsPage />} />
-          <Route path="/admin/crafts" element={<CraftsPage />} />
-          <Route path="/admin/settings" element={<SystemSettingsPage />} />
-          <Route path="/admin/ai" element={<AiAdministrationPage />} />
-          <Route path="/admin/shares" element={<SharingPage />} />
-          <Route path="/admin/workspaces" element={<WorkspaceAdministrationPage />} />
+          {/* ⚠️ **A PATHLESS layout route, and that is what lets the rail hold addresses that share no
+              prefix.** `/purposes` is on the Administration rail and stays a platform address — it is
+              the one flat entry deliberately kept out of `LEGACY_SPACE_SECTIONS` — and `/admin/mapping`
+              is on the Workbench's though it sits under `/admin`. A layout nested under `path="/admin"`
+              could express neither. */}
+          {/* ⚠️ **`/admin/users`, and `/admin` is no longer this screen.** User management answered at
+              `/admin` for as long as administration was one flat menu group; `/admin` is now the
+              Administration landing, and Users is the first place on it. Nothing breaks — an old
+              bookmark lands on the map instead of on one of its destinations. */}
+          <Route element={<NavigationScreenLayout screenKey="administration" />}>
+            <Route path="/admin" element={<NavigationScreenPage screenKey="administration" />} />
+            <Route path="/admin/users" element={<AdminPage />} />
+            <Route path="/admin/access" element={<AccessControlRoomPage />} />
+            <Route path="/admin/invitations" element={<InvitationsPage />} />
+            <Route path="/admin/crafts" element={<CraftsPage />} />
+            <Route path="/admin/settings" element={<SystemSettingsPage />} />
+            <Route path="/admin/ai" element={<AiAdministrationPage />} />
+            <Route path="/admin/shares" element={<SharingPage />} />
+            <Route path="/admin/workspaces" element={<WorkspaceAdministrationPage />} />
+            <Route path="/admin/plans" element={<PlanAdministrationPage />} />
+            <Route path="/purposes" element={<PurposesPage />} />
+          </Route>
+
+          <Route element={<NavigationScreenLayout screenKey="workbench" />}>
+            <Route path="/workbench" element={<NavigationScreenPage screenKey="workbench" />} />
+            {/* ⚠️ No permission and no data — the kit renders itself, so it answers with the backend down. */}
+            <Route path="/ui-kit" element={<UiKitPage />} />
+            <Route path="/admin/mapping" element={<MappingBuilderPage />} />
+          </Route>
+
+          {/* ⚠️ Outside every rail, and that is the frequency rule made concrete: the audit log is
+              administration by any definition and stays a sidebar row because it is opened daily. */}
           <Route path="/audit" element={<AuditLogPage />} />
-          <Route path="/admin" element={<AdminPage />} />
 
           <Route path={`${SPACE_ROUTE_ROOT}/:spaceSlug/settings`} element={<SpaceSettingsPage />} />
           <Route path={`${SPACE_ROUTE_ROOT}/:spaceSlug/settings/:tab`} element={<SpaceSettingsPage />} />

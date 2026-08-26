@@ -1,7 +1,19 @@
 import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
-import { Badge, Button, type FilterItem, FilterPanel, Input, Skeleton } from "@jmouse/ui"
+import {
+  Badge,
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  type FilterItem,
+  FilterPanel,
+  Input,
+  Skeleton,
+} from "@jmouse/ui"
+import { MoreHorizontal } from "lucide-react"
 import { CardGroup, PageCard } from "@/components/PageCard"
 import { LevelDoor } from "@/components/LevelDoor"
 import { PageHeader } from "@/components/PageHeader"
@@ -9,6 +21,8 @@ import { ViewBar } from "@/components/ViewBar"
 import { CardDensityToggle } from "@/components/CardDensityToggle"
 import { EntryFormDialog } from "@/components/form/EntryFormDialog"
 import { CreateFormDialog } from "@/components/form/CreateFormDialog"
+import { FormManagementDialog } from "@/components/form/FormManagementDialog"
+import { FormPreviewDialog } from "@/components/form/FormPreviewDialog"
 import { useCreateEntry, useDeleteForm, useWorkspaceForms } from "@/hooks/useWorkspaceForms"
 import { spaceSectionPath } from "@/lib/navigationContext"
 import { groupHues } from "@/lib/groupHues"
@@ -43,6 +57,8 @@ export function ComponentTypesPage() {
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [openFormId, setOpenFormId] = useState<string | null>(null)
+  const [managedTypeId, setManagedTypeId] = useState<string | null>(null)
+  const [previewTypeId, setPreviewTypeId] = useState<string | null>(null)
   const [activeViewId, setActiveViewId] = useState<string | null>(null)
 
   useViewFromAddress<{ categoryId?: string | null; search?: string }>("component-types", (applied, viewId) => {
@@ -61,6 +77,7 @@ export function ComponentTypesPage() {
   }, [types])
 
   const uncategorisedCount = types.filter((form) => !form.category).length
+  const managedType = types.find((form) => form.id === managedTypeId) ?? null
 
   const filterItems: FilterItem[] = [
     ...categories.map((category) => ({
@@ -174,6 +191,8 @@ export function ComponentTypesPage() {
                     form={form}
                     onOpenSchema={() => spaceSlug && navigate(spaceSectionPath(spaceSlug, `forms/${form.id}`))}
                     onAddEntry={() => setOpenFormId(form.id)}
+                    onManage={() => setManagedTypeId(form.id)}
+                    onPreview={() => setPreviewTypeId(form.id)}
                     onDelete={() =>
                       deleteForm.mutate(form.id, {
                         onSuccess: () => toast.success(`${form.name} deleted.`),
@@ -203,6 +222,19 @@ export function ComponentTypesPage() {
       )}
 
       {creating && <CreateFormDialog title="New component type" purposeCode={INVENTORY} onClose={() => setCreating(false)} />}
+
+      {/* ⚠️ **The same management dialog the form library opens**, and that is the point: a component
+          type IS a form with the `INVENTORY` purpose, so where it is filed, whether it is shared and how
+          its entries are summarised are one set of answers. A second editor here would be a second place
+          for them to be wrong. */}
+      {/* ⚠️ `domain`, not `base`: every form on this screen is an `INVENTORY` one inside this workspace,
+          so the subject area's own configuration — what counts as stock, what a price is read from —
+          belongs here and nowhere in the library (Ivan, 2026-08-25). */}
+      {managedType && (
+        <FormManagementDialog form={managedType} depth="domain" onClose={() => setManagedTypeId(null)} />
+      )}
+
+      {previewTypeId && <FormPreviewDialog formId={previewTypeId} onClose={() => setPreviewTypeId(null)} />}
     </>
   )
 }
@@ -211,11 +243,17 @@ function TypeCard({
   form,
   onOpenSchema,
   onAddEntry,
+  onManage,
+  onPreview,
   onDelete,
 }: {
   form: SpaceForm
   onOpenSchema: () => void
   onAddEntry: () => void
+  /** Where it is filed, who may reach it, how its entries are summarised — the form library's dialog. */
+  onManage: () => void
+  /** The type's own form, as somebody recording a part will meet it. Records nothing. */
+  onPreview: () => void
   onDelete: () => void
 }) {
   const published = form.status === "ACTIVE"
@@ -238,15 +276,35 @@ function TypeCard({
       actions={
         // ⚠️ Only a published type takes a row. A draft's schema is still being written, and a row
         // recorded against it would be answers to questions that changed afterwards.
-        published ? (
-          <Button variant="outline" size="sm" onClick={onAddEntry}>
-            Add one
-          </Button>
-        ) : undefined
+        <>
+          {published && (
+            <Button variant="outline" size="sm" onClick={onAddEntry}>
+              Add one
+            </Button>
+          )}
+
+          {/* ⚠️ **One visible verb and a menu**, the same shape the form library's card settled on: a
+              card whose chrome is taller than its content has stopped being a card. */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" aria-label="More" title="More">
+                <MoreHorizontal className="size-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={onPreview}>Preview</DropdownMenuItem>
+              <DropdownMenuItem onSelect={onManage}>Manage</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </>
       }
       // ⚠️ A door rather than a peer action — this screen is about what the workshop stocks, and the
       // schema behind a type is a level down. See `LevelDoor` for why the two must not mix.
-      door={<LevelDoor label="Manage" onOpen={onOpenSchema} />}
+      //
+      // ⚠️ It says *Schema*, not *Manage*, since 2026-08-25: managing a type is now a real thing beside
+      // it (where it is filed, whether it is shared, how its rows are summarised), and two different
+      // destinations cannot both be called the same word.
+      door={<LevelDoor label="Schema" onOpen={onOpenSchema} />}
       onDelete={onDelete}
       confirmMessage={`Really delete “${form.name}”`}
     />

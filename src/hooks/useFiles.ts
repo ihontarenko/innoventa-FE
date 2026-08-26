@@ -15,12 +15,19 @@ import {
  * link is a Sharing Center row rather than a property of a file — so the list comes from one and the
  * links from the other, in one request for the whole page rather than one per row.
  */
-export function useMyFiles() {
+export function useMyFiles(rootName?: string) {
   return useQuery<FileWithLink[]>({
-    queryKey: ["files", "mine"],
+    queryKey: ["files", "mine", rootName ?? "cabinet"],
     queryFn: async () => {
+      /*
+        ⚠️ **The root has to match where uploads go, or "choose existing" cannot see them.** Once a
+        feature's uploads land in their own root, a picker still listing the cabinet shows everything
+        except the files somebody just added — which reads as the upload having failed.
+      */
+      const directory = rootName ? await folderId(rootName) : await cabinetId()
+
       const files = await filesApi
-        .list(fileOwner.directory(await cabinetId()))
+        .list(fileOwner.directory(directory))
         .then((response) => response.data)
 
       return withLinks(files)
@@ -52,13 +59,22 @@ export function useUploadFile() {
   return useMutation<
     FileWithLink,
     unknown,
-    { file: File; directoryId?: string; onProgress?: (percent: number) => void }
+    {
+      file: File
+      directoryId?: string
+      /**
+       * ⚠️ **Which named root this belongs in** — `inventory`, `cad`. Resolved on the server, which
+       * creates it on first ask, so nothing here has to know a path.
+       */
+      rootName?: string
+      onProgress?: (percent: number) => void
+    }
   >({
-    mutationFn: async ({ file, directoryId, onProgress }) => {
-      // ⚠️ A file has to go SOMEWHERE now — the library files against an owner, and there is no such
-      // thing as an unfiled file. A form field upload names no folder, so it lands in the account's own
-      // cabinet, which is exactly where it used to appear when files had no folder at all.
-      const destination = directoryId ?? (await cabinetId())
+    mutationFn: async ({ file, directoryId, rootName, onProgress }) => {
+      // ⚠️ A file has to go SOMEWHERE — the library files against an owner, and there is no such thing
+      // as an unfiled file. An explicit folder wins; a named root is what a feature's own form asks for;
+      // and the cabinet is the last answer, for a fill that belongs to no feature at all.
+      const destination = directoryId ?? (rootName ? await folderId(rootName) : await cabinetId())
 
       const stored = await filesApi
         .upload(fileOwner.directory(destination), file, onProgress)
@@ -69,8 +85,60 @@ export function useUploadFile() {
   })
 }
 
-/** This account's own file cabinet, made on first use by the backend. */
-async function cabinetId(): Promise<string> {
+/**
+ * A file this installation fetches for somebody, from an address rather than from their disk.
+ *
+ * ⚠️ **The SERVER does the fetching, and that is the whole reason this exists.** A distributor's PDF is
+ * on somebody else's origin with no CORS headers, so a browser cannot read the bytes at all — it can
+ * only open the link in a tab. Keeping a copy therefore has to be asked of the backend, which refuses
+ * loopback, site-local and link-local addresses for every address the host resolves to.
+ *
+ * ⚠️ **It lands in the account's own cabinet when no folder is named**, exactly like a form upload.
+ */
+export function useImportFile() {
+  return useMutation<FileWithLink, unknown, { url: string; directoryId?: string }>({
+    mutationFn: async ({ url, directoryId }) => {
+      const destination = directoryId ?? (await cabinetId())
+
+      const stored = await filesApi
+        .importFrom(fileOwner.directory(destination), url)
+        .then((response) => response.data)
+
+      return withLinks([stored]).then((withToken) => withToken[0])
+    },
+  })
+}
+
+/**
+ * The caller's directory for one kind of file, made on the server the first time it is asked for.
+ *
+ * ⚠️ **Memoised for the session.** A root's id does not change once it exists, and an upload control
+ * mounting on every row of a form would otherwise ask again per field.
+ */
+const folderIds = new Map<string, Promise<string>>()
+
+export function folderId(name: string): Promise<string> {
+  const known = folderIds.get(name)
+  if (known) {
+    return known
+  }
+
+  const asked = filesApi
+    .folder(name)
+    .then((response) => response.data.id)
+    .catch((failure) => {
+      // ⚠️ A failed lookup must not be remembered as the answer — the next upload would inherit a
+      // rejected promise for the rest of the session and fail for a reason that is long gone.
+      folderIds.delete(name)
+      throw failure
+    })
+
+  folderIds.set(name, asked)
+  return asked
+}
+
+/** The caller's own cabinet directory — where anything uploaded with no folder in mind lands. */
+export async function cabinetId(): Promise<string> {
   const profile = await authApi.getProfile().then((response) => response.data)
 
   if (!profile.filesRootId) {

@@ -41,6 +41,7 @@ export function ChoicesSection({ editor }: { editor: ReturnType<typeof useFieldD
   return (
     <EditorSection
       title={isColour ? "Swatches" : "Choices"}
+      icon={isColour ? "◐" : "▾"}
       badge={isStatic ? draft.options.length : source}
       hint={isColour ? undefined : isStatic ? undefined : "drawn by a provider"}
     >
@@ -60,16 +61,19 @@ export function ChoicesSection({ editor }: { editor: ReturnType<typeof useFieldD
             </Button>
           </div>
 
+          {/* ⚠️ Capped rather than stretched. This card spans the full width of the editor, and a label
+              box a thousand pixels wide for `±5%` makes a list of seven choices unreadable — the eye has
+              to travel the whole line to pair a value with its label. */}
           {isRaw ? (
             <Textarea
               rows={4}
-              className="font-mono text-xs"
+              className="max-w-3xl font-mono text-xs"
               placeholder={isColour ? "#FF0000:Red, #00AA00:Green" : "pF:picoFarads, nF:nanoFarads"}
               value={serializeOptions(draft.options)}
               onChange={(event) => update({ options: parseOptions(event.target.value) })}
             />
           ) : (
-            <div className="flex flex-col gap-1">
+            <div className="flex max-w-3xl flex-col gap-1">
               {draft.options.map((option, index) => (
                 <div key={index} className="flex items-center gap-1">
                   {isColour && (

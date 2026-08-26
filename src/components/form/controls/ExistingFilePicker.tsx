@@ -2,6 +2,7 @@ import { useState } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, Skeleton } from "@jmouse/ui"
 import { fileLinks, type FileWithLink } from "@/api/files"
 import { useMyFiles } from "@/hooks/useFiles"
+import { useUploadDestination } from "@/components/form/UploadDestination"
 
 /**
  * Attaching a file the workspace already has.
@@ -22,7 +23,8 @@ export function ExistingFilePicker({
   onClose: () => void
 }) {
   const [search, setSearch] = useState("")
-  const { data, isLoading } = useMyFiles()
+  // ⚠️ The same root uploads go to, so a file added a moment ago is offered here rather than missing.
+  const { data, isLoading } = useMyFiles(useUploadDestination())
 
   // ⚠️ Filtered in the browser, over one folder's contents. The paging controls went with INVT-0063:
   // this is a directory's contents now rather than a page of an account-wide query, and pretending to

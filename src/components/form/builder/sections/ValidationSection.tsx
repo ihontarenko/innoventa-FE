@@ -20,7 +20,7 @@ export function ValidationSection({ editor }: { editor: ReturnType<typeof useFie
   const { draft, update } = editor
 
   return (
-    <EditorSection title="Validation" badge={draft.validation.length || undefined} defaultOpen={false}>
+    <EditorSection title="Validation" icon="✓" badge={draft.validation.length || undefined} defaultOpen={false}>
       <Textarea
         rows={3}
         className="font-mono text-xs"

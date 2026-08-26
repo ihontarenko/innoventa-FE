@@ -22,6 +22,10 @@ import { AccessDenied } from "@/components/AccessDenied"
 import { PageHeader } from "@/components/PageHeader"
 import { useCreateInvitation, useInvitations, useRevokeInvitation } from "@/hooks/useInvitations"
 import { useAuthStore } from "@/stores/authStore"
+import { platformItem, requiredPermissionsOf } from "@/navigation"
+
+/** The declaration this screen is reached by — asked, never re-typed. See `AccessRequirement`. */
+const INVITATIONS = platformItem("admin-invitations")
 import { readableDate } from "@/lib/dates"
 import type { InvitationView } from "@/api/admin"
 
@@ -33,7 +37,7 @@ import type { InvitationView } from "@/api/admin"
  * `AdminInvitationController` asks for, and the two must not drift.
  */
 export function InvitationsPage() {
-  const holdsEverywhere = useAuthStore((state) => state.holdsEverywhere)
+  const mayOpen = useAuthStore((state) => state.holds)
 
   const { data: invitations = [], isLoading } = useInvitations()
   const revokeInvitation = useRevokeInvitation()
@@ -42,12 +46,12 @@ export function InvitationsPage() {
   const [revoking, setRevoking] = useState<string | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
 
-  if (!holdsEverywhere("user:read")) {
+  if (!mayOpen(INVITATIONS)) {
     return (
       <AccessDenied
         title="Invitations"
         why="An invitation code is the first half of an account in this installation, so it is read with the same permission accounts are."
-        permissions={["user:read"]}
+        permissions={requiredPermissionsOf(INVITATIONS)}
       />
     )
   }

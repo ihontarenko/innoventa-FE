@@ -137,10 +137,31 @@ export interface TagStats extends Tag {
   count: number
 }
 
+/** What one thing carries. ⚠️ `tags` is the whole set — there is no partial answer. */
+export interface EntityTags {
+  entityId: string
+  tags: Tag[]
+}
+
 export const tagsApi = {
   listByEntityKind: (entityKind: string) => http.get<Tag[]>("/tags", { params: { entityKind } }),
 
   getStats: (entityKind: string) => http.get<TagStats[]>("/tags/stats", { params: { entityKind } }),
 
   getEntityIdsByTag: (tagId: string) => http.get<string[]>("/tags/entities/by-tag", { params: { tagId } }),
+
+  getEntityTags: (entityId: string) => http.get<EntityTags>(`/tags/entities/${entityId}`),
+
+  /**
+   * What this thing carries, from now on.
+   *
+   * ⚠️ **By NAME, and it replaces the whole set.** The backend deletes every assignment and writes the
+   * list back, minting any name it has not seen before — so there is no "add one" call to reach for,
+   * and a caller that sent only the new tag would drop the rest. Read, then send the whole list.
+   *
+   * ⚠️ **`entityKind` is not optional and not guessable.** A `FIELD` tag and a `FORM` tag of the same
+   * name are two rows; sending the wrong kind files the thing under a vocabulary nobody is looking at.
+   */
+  setEntityTags: (entityId: string, entityKind: string, tagNames: string[]) =>
+    http.put<EntityTags>(`/tags/entities/${entityId}`, { entityKind, tagNames }),
 }

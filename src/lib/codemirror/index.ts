@@ -8,7 +8,7 @@ import {
   SYNTAX_HIGHLIGHT_STYLE,
 } from "@jmouse/codemirror/highlight"
 
-export { jmpSyntax, jMouseEL } from "@jmouse/codemirror"
+export { jmpSyntax, jmeSyntax } from "@jmouse/codemirror"
 
 /**
  * Innoventa's CodeMirror configuration — which grammars it answers for, and nothing else.

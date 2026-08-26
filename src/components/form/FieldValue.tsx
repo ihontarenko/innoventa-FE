@@ -1,3 +1,4 @@
+import { ExternalLink, Paperclip } from "lucide-react"
 import { cn } from "@jmouse/ui"
 import { fileLinks, parseFileFieldValue } from "@/api/files"
 import { normalizeValueForUI } from "@/lib/fieldValues"
@@ -79,10 +80,31 @@ export function FieldValue({
   }
 
   if (type === "FILE" || file) {
+    const filename = file ? file.filename : value
+
+    // ⚠️ A reference with no view token is text, not a broken link. It is what a field holds before the
+    // upload finished and after a share was revoked, and `/_/file/undefined` is worse than plain words.
+    if (!file) {
+      return (
+        <span className={cn("inline-flex max-w-full items-baseline gap-1", className)} title={filename}>
+          <Paperclip className="size-3 shrink-0 self-center opacity-60" />
+          <span className="truncate">{filename}</span>
+        </span>
+      )
+    }
+
     return (
-      <span className={className}>
-        📎 {file ? file.filename : value}
-      </span>
+      <a
+        href={fileLinks.view(file.viewToken)}
+        target="_blank"
+        rel="noreferrer"
+        onClick={(event) => event.stopPropagation()}
+        className={cn("inline-flex max-w-full items-baseline gap-1 text-primary hover:underline", className)}
+        title={filename}
+      >
+        <Paperclip className="size-3 shrink-0 self-center opacity-70" />
+        <span className="truncate">{filename}</span>
+      </a>
     )
   }
 
@@ -93,10 +115,11 @@ export function FieldValue({
         target="_blank"
         rel="noreferrer"
         onClick={(event) => event.stopPropagation()}
-        className={cn("truncate text-primary hover:underline", className)}
+        className={cn("inline-flex max-w-full items-baseline gap-1 text-primary hover:underline", className)}
         title={value}
       >
-        {value}
+        <span className="truncate">{readableLink(value)}</span>
+        <ExternalLink className="size-3 shrink-0 self-center opacity-60" />
       </a>
     )
   }
@@ -125,4 +148,31 @@ export function FieldValue({
       {suffix}
     </span>
   )
+}
+
+/** How long an address may be before it is worth shortening rather than truncating. */
+const LINK_SHOWN_WHOLE = 52
+
+/**
+ * A web address, said the way somebody reads one out.
+ *
+ * ⚠️ **Shortened rather than truncated, and the two are not the same.** A cell 40 characters wide cuts
+ * `https://mm.digikey.com/Volume0/opasdata/d220001/medias/…` off at `opasdata`, which names neither the
+ * distributor nor the file; `mm.digikey.com/…/MFG_296.jpg` names both. The whole address stays on the
+ * `title` and in the `href`, so nothing is lost — only the middle, which nobody reads.
+ */
+function readableLink(url: string): string {
+  if (url.length <= LINK_SHOWN_WHOLE) {
+    return url
+  }
+
+  try {
+    const parsed = new URL(url)
+    const last = parsed.pathname.split("/").filter(Boolean).pop()
+
+    return last ? `${parsed.host}/…/${decodeURIComponent(last)}` : parsed.host
+  } catch {
+    // Not something `URL` can parse — a relative path, or a typo. Shown as it was typed.
+    return url
+  }
 }

@@ -3,6 +3,7 @@ import { toast } from "sonner"
 import { Badge, Button, Input, Row, RowGroup, RowKey, RowList, RowMeta, RowTitle, Skeleton } from "@jmouse/ui"
 import { AccessDenied } from "@/components/AccessDenied"
 import { Callout } from "@/components/Callout"
+import { GlyphInput } from "@/components/GlyphInput"
 import { PageHeader } from "@/components/PageHeader"
 import { EditorField } from "@/components/form/builder/EditorSection"
 import {
@@ -16,6 +17,10 @@ import {
   useUpdatePurpose,
 } from "@/hooks/useWorkspaceForms"
 import { useAuthStore } from "@/stores/authStore"
+import { platformItem, requiredPermissionsOf } from "@/navigation"
+
+/** The declaration this screen is reached by — asked, never re-typed. See `AccessRequirement`. */
+const PURPOSES = platformItem("purposes")
 import type { FormCategory, FormPurpose } from "@/types"
 
 /**
@@ -35,10 +40,19 @@ import type { FormCategory, FormPurpose } from "@/types"
  * code existing; offering an edit that the backend refuses is worse than not offering it.
  */
 export function PurposesPage() {
-  const holdsEverywhere = useAuthStore((state) => state.holdsEverywhere)
+  const mayOpen = useAuthStore((state) => state.holds)
 
-  const canRead = holdsEverywhere("purpose:read")
-  const canWrite = holdsEverywhere("purpose:write")
+  // ⚠️ **The one entry on the Administration screen whose gate is NOT installation-wide, and the
+  // correction went the other way.** `Permissions.java` maps `purpose:read` to `AccessScope.SPACE` and
+  // `FormPurposeController` declares `scope = Scopes.SPACE`, so the backend answers this to anybody who
+  // holds it in a workspace — while this screen was asking `holdsEverywhere` and refusing them. The
+  // screen was stricter than the server, which discloses nothing extra and simply locked people out of
+  // a list every workspace already reads. The declaration is now the single answer.
+  const canRead = mayOpen(PURPOSES)
+
+  // A WRITE gate: `purpose:write` leads to no menu row and has no declaration to ask. The
+  // one-declaration rule is about a destination's door, not about every control behind it.
+  const canWrite = useAuthStore((state) => state.holdsSomewhere)("purpose:write")
 
   const { data: purposes = [], isLoading } = usePurposes()
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -55,8 +69,8 @@ export function PurposesPage() {
     return (
       <AccessDenied
         title="Purposes"
-        why="A purpose is read by every workspace in this installation, so reading the vocabulary is an installation-wide question rather than a workspace one."
-        permissions={["purpose:read"]}
+        why="A purpose is read by every workspace in this installation, and this account holds that in none of them."
+        permissions={requiredPermissionsOf(PURPOSES)}
       />
     )
   }
@@ -160,13 +174,7 @@ function PurposesPane({
         <div className="flex flex-col gap-2 rounded-md border p-3">
           <div className="flex gap-2">
             <EditorField label="Glyph">
-              <Input
-                className="h-8 w-16 text-center text-sm"
-                maxLength={2}
-                value={icon}
-                placeholder="📦"
-                onChange={(event) => setIcon(event.target.value)}
-              />
+              <GlyphInput value={icon} onChange={setIcon} placeholder="📦" />
             </EditorField>
 
             <EditorField label="Label">
@@ -347,13 +355,7 @@ function CategoriesPane({ purpose, canWrite }: { purpose: FormPurpose; canWrite:
     >
       {canWrite && (
         <div className="flex items-end gap-2">
-          <Input
-            className="h-8 w-16 text-center text-sm"
-            maxLength={2}
-            value={icon}
-            placeholder="◫"
-            onChange={(event) => setIcon(event.target.value)}
-          />
+          <GlyphInput value={icon} onChange={setIcon} />
           <Input
             className="h-8 flex-1 text-sm"
             value={name}

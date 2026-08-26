@@ -82,6 +82,15 @@ export const useAuthStore = create<AuthState>()(
        * A destination that asks for nothing is open — no permission means no gate, not an empty one.
        */
       holds: (requirement) => {
+        // ⚠️ **Before the single-permission question, and never beside it.** A row leading to a whole
+        // screen is offered when the reader holds ANY of that screen's own requirements — an entry
+        // holding nothing of its own makes the screen open, which is correct: the UI kit genuinely is.
+        // Answering `true` first for a screen with no `requiredPermission` of its own would offer
+        // Administration to everybody.
+        if (requirement.requiredAnyOf) {
+          return requirement.requiredAnyOf.some((one) => get().holds(one))
+        }
+
         if (!requirement.requiredPermission) {
           return true
         }
