@@ -11,17 +11,22 @@ import { useMemo } from "react"
  * | Surface | Blocks resolve… |
  * |---|---|
  * | `app` | against the private endpoint, in full, for a reader this product signed in |
- * | `publicKiwi` | by the page's Kiwi address, anonymously — only the public-safe subset; the rest come back redacted |
+ * | `publicShare` | by the share token of a page published out of THIS database — only the public-safe subset |
+ * | `publicKiwi` | by the page's Kiwi address, anonymously — the same subset, out of a document Kiwi holds |
  * | `inert` | not at all; server blocks show a quiet notice and the client directives still render |
  *
- * ⚠️ **The two share-token surfaces are gone with the page store** (INVT-0099). `public` resolved
- * against a page shared out of *this* database and `publicCategory` against a shared subtree of them;
- * there are no such pages any more. What replaced both is `publicKiwi`, and the difference is not
- * cosmetic: the allowlist is no longer a row this product owns but **a document it fetched from Kiwi as
- * a granted product**, which is the whole subject of INVT-0093.
+ * ⚠️ **The two public surfaces are not one surface with two addresses.** They differ in who holds the
+ * document the allowlist is computed from: `publicShare` reads a row this product owns, `publicKiwi`
+ * re-fetches the text from Kiwi as a granted product. The policy applied to each is identical — which
+ * is why it is tempting to merge them, and why merging them would put one product's authority behind
+ * the other's content.
+ *
+ * ⚠️ `publicCategory` is NOT coming back. It resolved blocks inside a shared folder subtree, and
+ * publishing a folder is something this product no longer does — the public manual is Kiwi's, embedded.
  */
 export type MarkdownSurface =
   | { readonly kind: "app" }
+  | { readonly kind: "publicShare"; readonly shareToken: string }
   | { readonly kind: "publicKiwi"; readonly address: string }
   | { readonly kind: "inert" }
 
@@ -29,6 +34,16 @@ export const APP_SURFACE: MarkdownSurface = { kind: "app" }
 
 /** Resolves nothing server-side; only the client directives render. */
 export const INERT_SURFACE: MarkdownSurface = { kind: "inert" }
+
+/**
+ * A page published out of this product, addressed by the token in its link.
+ *
+ * ⚠️ **The token is the whole authorisation**, so the server matches every requested directive against
+ * the text it looks up itself — the allowlist is never something the visitor sent.
+ */
+export function publicShareSurface(shareToken: string): MarkdownSurface {
+  return { kind: "publicShare", shareToken }
+}
 
 /**
  * A page of the public manual, addressed the way a link addresses it (`KW-1` §7).
@@ -73,6 +88,8 @@ function surfaceIdentity(surface: MarkdownSurface): string {
       return "app"
     case "inert":
       return "inert"
+    case "publicShare":
+      return `share:${surface.shareToken}`
     case "publicKiwi":
       return `kiwi:${surface.address}`
   }
@@ -88,12 +105,15 @@ function surfaceIdentity(surface: MarkdownSurface): string {
 export type BlockResolution =
   | { readonly mode: "none" }
   | { readonly mode: "authenticated" }
+  | { readonly mode: "publicShare"; readonly shareToken: string }
   | { readonly mode: "publicKiwi"; readonly address: string }
 
 export function surfaceResolution(surface: MarkdownSurface): BlockResolution {
   switch (surface.kind) {
     case "app":
       return { mode: "authenticated" }
+    case "publicShare":
+      return { mode: "publicShare", shareToken: surface.shareToken }
     case "publicKiwi":
       return { mode: "publicKiwi", address: surface.address }
     case "inert":

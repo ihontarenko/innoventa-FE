@@ -1,4 +1,6 @@
 import { http } from "./http"
+import type { PageBlockResponse } from "./blocks"
+import type { PageRenderStyle } from "./pages"
 import type { FormDetail, FormEntry } from "@/types"
 
 /**
@@ -9,6 +11,31 @@ import type { FormDetail, FormEntry } from "@/types"
  * why revoking one is the only way to take access back. `http.ts` knows not to attempt a token refresh on
  * a 401 from here: a visitor with no session must see the resource's own answer, not a sign-in page.
  */
+/** A published page, as a stranger holding its link receives it: the document and nothing around it. */
+export interface PublicPage {
+  title: string
+  contentMarkdown: string
+  renderStyle: PageRenderStyle
+  updatedAt: string
+}
+
+export const publicPagesApi = {
+  get: (shareToken: string) => http.get<PublicPage>(`/public/pages/${shareToken}`),
+
+  /**
+   * The page's live `:::` directives, resolved for a visitor.
+   *
+   * ⚠️ **Only the public-safe subset answers; the rest come back RESTRICTED** — visibly, never as
+   * silence, so a reader can tell a redacted number from a missing one.
+   *
+   * ⚠️ **Addressed by the share token, not by a page id.** The token is the authorisation, and this
+   * request cannot lean on the one that fetched the document — a public endpoint accepting an id would
+   * read any page's live data for anybody who could guess one.
+   */
+  resolveBlocks: (shareToken: string, blocks: Array<{ name: string; argument: string }>) =>
+    http.post<PageBlockResponse[]>(`/public/pages/${shareToken}/blocks/resolve`, blocks),
+}
+
 export const publicFormsApi = {
   getForm: (shareToken: string) => http.get<FormDetail>(`/public/forms/${shareToken}`),
 

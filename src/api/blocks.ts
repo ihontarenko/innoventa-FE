@@ -1,31 +1,47 @@
-import { http } from "./http"
+import { createApiClient } from "./http"
+import { LIBRARY_ROUTES } from "./libraryRoutes"
 import type { MaterialCoverageStatus } from "./projects"
 
 /**
- * Live-data blocks — the directives a document embeds and this product answers (INVT-0099).
+ * ⚠️ **The LIBRARY's address, not Innoventa's `/api`** — `jmouse-liveblocks` serves these, and since
+ * 2026-08-25 every library surface answers under `/jmouse/…`. It was `/api/blocks`, which is precisely
+ * what a library must not take: the product's own URL space, where a route it wants one day collides
+ * with this one and neither can start.
  *
- * <h2>⚠️ Not `api/pages.ts` any more, because Innoventa has no pages</h2>
+ * ⚠️ **This address is a WIRE CONTRACT and is fixed in the library** — another product's document holds
+ * a namespace and an origin and appends it. Moving it here alone would make Innoventa's blocks
+ * unreachable from every consumer that was not moved in the same release.
+ */
+const http = createApiClient(LIBRARY_ROUTES.blocks)
+
+/**
+ * Live-data blocks — the directives a document embeds and this product answers.
  *
- * These types and calls used to sit beside a page store that has been deleted: the pages live in Kiwi,
- * which owns them and decides who reads them. What survived is the half that was never about storage —
- * a registry of directives that read **this** product's stock, parts, BOMs and locations **at view
- * time**, so a bring-up log written in March still shows correct numbers in September.
+ * <h2>⚠️ Its own module, and it stays its own module now that there are pages again</h2>
  *
- * <h2>⚠️ Whoever holds the markdown asks, and that is somebody else now</h2>
+ * These types and calls sat beside the page store until that store was deleted, and they were moved out
+ * because they were never about storage: a registry of directives that read **this** product's stock,
+ * parts, BOMs and locations **at view time**, so a bring-up log written in March still shows correct
+ * numbers in September. Moving them back would be a mistake, because the reason they left has outlived
+ * the reason they were moved.
  *
- * A screen renders a Kiwi document and asks here for the numbers in it. The address moved with the
- * ownership — `/api/blocks` rather than `/api/pages` — because a route named after a store this
- * product no longer has is a lie that survives every refactor.
+ * <h2>⚠️ Whoever holds the markdown asks, and that is more than one product</h2>
+ *
+ * A page this product stores embeds directives; so does a page of the public manual, which Kiwi holds
+ * and this product republishes. Both ask here. The address says `/jmouse/blocks` rather than
+ * `/api/pages` for exactly that reason — a route named after one of the two stores would be wrong about
+ * the other every time.
  */
 
 /**
  * How a page is set — a typographic decision, not a content one.
  *
- * ⚠️ **It changes the reading, never the markdown.** The same source renders as a datasheet, an essay
- * or a dense reference; a style that rewrote content would make the source and the page two different
- * documents.
+ * ⚠️ **Defined in `api/pages.ts`, and re-exported here.** It is a property of a page and it lived in
+ * this module only while this product had no pages to put it on. Re-exported rather than moved outright
+ * because every renderer already imports it from here, and two declarations of one type in two modules
+ * is how the two stop agreeing.
  */
-export type PageRenderStyle = "REGULAR" | "TECHNICAL" | "EDITORIAL" | "COMPACT" | "ACADEMIC"
+export type { PageRenderStyle } from "./pages"
 
 /**
  * One live-data directive this workspace may write, as the editor's block palette needs it.
@@ -133,9 +149,9 @@ export const blocksApi = {
    * ⚠️ An **offer**, not a gate — resolution deliberately does not consult it, so a document written
    * before a module was switched off still reads as a visible notice rather than as silence.
    */
-  catalog: () => http.get<BlockCatalogEntry[]>("/blocks/catalog"),
+  catalog: () => http.get<BlockCatalogEntry[]>("/catalog"),
 
   /** Resolve directives for a signed-in reader. Every resolver authorises against the data it reads. */
   resolve: (blocks: Array<{ name: string; argument: string }>) =>
-    http.post<PageBlockResponse[]>("/blocks/resolve", blocks),
+    http.post<PageBlockResponse[]>("/resolve", blocks),
 }

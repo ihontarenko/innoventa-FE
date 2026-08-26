@@ -180,10 +180,10 @@ function addressOf(hit: SearchHit, spaceSlug: string): string | null {
       return formId ? spaceSectionPath(spaceSlug, `entry/${formId}/${hit.id}`) : null
     }
 
-    // ⚠️ Pages are moving to Kiwi (`KW-13`), so there is deliberately no address for one yet — a link
-    // built now would point at a screen that is about to stop existing.
+    // A page has an address of its own again — this product stores them, and the screen that opens one
+    // is a workspace route like an entry's.
     case "page":
-      return null
+      return spaceSectionPath(spaceSlug, `pages/${hit.id}`)
 
     default:
       return null

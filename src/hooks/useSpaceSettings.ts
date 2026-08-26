@@ -56,7 +56,6 @@ export function useUpdateSpace() {
       subjectAreaCode?: string
       // ⚠️ "" CLEARS the branch; omitting the key leaves it alone. Every other field here reads absent
       // as unchanged, which works because none of them can be unset — this one can (INVT-0120).
-      kiwiRootCategoryId?: string
     }) => spaceSettingsApi.update(spaceId, payload).then((response) => response.data),
   )
 }

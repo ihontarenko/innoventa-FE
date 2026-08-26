@@ -9,13 +9,11 @@ import { FAST_PREVIEW_ACTION, INNOVENTA_TOOLBAR, INNOVENTA_WRITING_PLUGINS } fro
 /**
  * A document, **written** (INVT-0121).
  *
- * <h2>⚠️ Reading already had a home; writing did not</h2>
+ * <h2>⚠️ Reading had a home before writing did</h2>
  *
- * `PageMarkdown` has drawn documents here since the interface was ported. Nothing could produce one:
- * the Pages screen offered a link to Kiwi's own editor instead, on the reasoning that writing and
- * access are Kiwi's. Access is. **Writing is not** — Kiwi refuses a write it does not allow, and the
- * honest interface offers the control and repeats the refusal. Hiding it on a local guess reproduces
- * Kiwi's rules here, badly, and the first time the two disagree the wrong one is the invisible one.
+ * `PageMarkdown` drew documents here for a while before anything could produce one — the Pages screen
+ * pointed at another product's editor instead. It is this product's own store again, and the editor is
+ * the one that writes into it.
  *
  * <h2>⚠️ One renderer for the source's preview and for the page</h2>
  *

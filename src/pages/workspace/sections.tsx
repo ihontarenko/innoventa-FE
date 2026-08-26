@@ -41,8 +41,8 @@ export const SCREENS: Record<string, ComponentType> = {
   forms: FormLibraryPage,
   inventory: InventoryPage,
   locations: LocationsPage,
-  // ⚠️ Read from KIWI, not from this product (INVT-0097). Innoventa stores no pages after INVT-0099;
-  // the screen is a window onto another product, and the token it carries is an Identity one.
+  // ⚠️ This product's own store, read with the ordinary session. It was a window onto another product
+  // for a while; it is not any more, and only the anonymous public manual still comes from there.
   pages: PagesPage,
   // ⚠️ Not the members screen. A holder is an entry on a `HOLDER` form — an employee, a crew, a rental
   // client — and none of them need an account. `/admin/access` is where people with accounts live.
@@ -89,10 +89,6 @@ export const TICKET_BY_SECTION: Record<string, string> = {
   assets: "INVT-0054",
   files: "INVT-0054",
   locations: "INVT-0054",
-  // ⚠️ **Not this epic's any more.** Pages stop being Innoventa's own store and become Kiwi's, read
-  // across origins with the reader's own token — see `KW-13`. Innoventa keeps the markdown renderer and
-  // stays the resolver for the live `:::` blocks, which is why that layer is built and this screen is not.
-
   search: "INVT-0054",
   labels: "INVT-0085",
   tools: "INVT-0057",

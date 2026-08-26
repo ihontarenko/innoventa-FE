@@ -2,14 +2,16 @@ import { useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { blocksApi, type BlockCatalogEntry, type PageBlockResponse } from "@/api/blocks"
 import { resolveManualBlocks } from "@/api/manual"
+import { publicPagesApi } from "@/api/public"
 import type { BlockResolution } from "@/components/markdown/surface"
 
 /**
- * Live-data blocks (INVT-0099).
+ * Live-data blocks.
  *
- * ⚠️ **Split out of `usePages` because there are no pages here any more.** These hooks never had
- * anything to do with the page store — they read *this* product's stock, parts, BOMs and locations for
- * whatever document happens to embed a directive, and that document is Kiwi's now.
+ * ⚠️ **Separate from the page hooks, and it stays separate now that there are pages again.** These read
+ * *this* product's stock, parts, BOMs and locations for whatever document happens to embed a directive —
+ * and the documents come from more than one place: a page this product stores, a page of the manual that
+ * Kiwi does. Tying the engine to either store would make the other one render notices.
  */
 
 /** One `:::name argument` to resolve. */
@@ -36,6 +38,8 @@ function resolutionKey(resolution: BlockResolution): string[] {
   switch (resolution.mode) {
     case "authenticated":
       return ["auth"]
+    case "publicShare":
+      return ["share", resolution.shareToken]
     case "publicKiwi":
       return ["kiwi", resolution.address]
     case "none":
@@ -50,6 +54,8 @@ function resolveDirectives(resolution: BlockResolution, directives: readonly Blo
   switch (resolution.mode) {
     case "authenticated":
       return blocksApi.resolve(payload)
+    case "publicShare":
+      return publicPagesApi.resolveBlocks(resolution.shareToken, payload)
     case "publicKiwi":
       return resolveManualBlocks(resolution.address, payload)
     case "none":

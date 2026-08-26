@@ -6,6 +6,7 @@ import { AppearanceSettingsPage } from "@/pages/AppearanceSettingsPage"
 import { BugReportPage } from "@/pages/BugReportPage"
 import { LandingPage } from "@/pages/landing/LandingPage"
 import AssistantPage from "@/pages/AssistantPage"
+import SavedViewsPage from "@/pages/SavedViewsPage"
 import { UiKitPage } from "@/pages/ui-kit/UiKitPage"
 import { SettingsPage } from "@/pages/settings/SettingsPage"
 import { SpaceSettingsPage } from "@/pages/space/SpaceSettingsPage"
@@ -21,7 +22,10 @@ import { WorkspaceAdministrationPage } from "@/pages/admin/WorkspaceAdministrati
 import { AuditLogPage } from "@/pages/audit/AuditLogPage"
 import { EntryPage } from "@/pages/EntryPage"
 import { FormBuilderPage } from "@/pages/FormBuilderPage"
+import { FieldDetailPage } from "@/pages/workspace/FieldDetailPage"
+import { FormManagementPage } from "@/pages/workspace/FormManagementPage"
 import { ProjectDetailPage } from "@/pages/ProjectDetailPage"
+import { PageDetailPage } from "@/pages/workspace/PageDetailPage"
 import { LabelStudioPage } from "@/pages/LabelStudioPage"
 import { HubPage } from "@/pages/HubPage"
 import { PlaceholderPage } from "@/pages/PlaceholderPage"
@@ -31,6 +35,7 @@ import { ManualPage } from "@/pages/public/ManualPage"
 import { PrettyUrlPage } from "@/pages/public/PrettyUrlPage"
 import { PublicEntryPage } from "@/pages/public/PublicEntryPage"
 import { PublicFormPage } from "@/pages/public/PublicFormPage"
+import { PublicPageView } from "@/pages/public/PublicPageView"
 import { EmailVerifyPage } from "@/pages/auth/EmailVerifyPage"
 import { MagicLinkPage } from "@/pages/auth/MagicLinkPage"
 import { MagicLinkVerifyPage } from "@/pages/auth/MagicLinkVerifyPage"
@@ -38,6 +43,9 @@ import { OAuth2CallbackPage } from "@/pages/auth/OAuth2CallbackPage"
 import { RegisterPage } from "@/pages/auth/RegisterPage"
 import { SignInPage } from "@/pages/auth/SignInPage"
 import { WorkspaceSectionPage } from "@/pages/WorkspaceSectionPage"
+import { StationPage } from "@/pages/station/StationPage"
+import { StationsPage } from "@/pages/stations/StationsPage"
+import { CraftsPage } from "@/pages/admin/CraftsPage"
 import { SPACE_ROUTE_ROOT } from "@/lib/navigationContext"
 import { navigationItems } from "@/navigation"
 
@@ -79,16 +87,20 @@ export function ApplicationRoutes() {
           and outside `NavigationContextGate`: a visitor has no token and no workspace, and a gate that
           asked for either would send somebody holding a perfectly good link to a sign-in page.
 
-          ⚠️ `/_/page/*`, `/_/category/*` and `/_/viewer/*` are deliberately absent. Pages move to Kiwi
-          (`KW-13`) and the file endpoints are mid-migration, so their public screens are unported
-          rather than half-ported — the old interface still answers those addresses. */}
-      {/* The manual: public, anonymous, read out of Kiwi through Innoventa (INVT-0116). Addressed by
-          the permanent address so a link keeps working (KW-1 §7). */}
+          ⚠️ `/_/category/*` and `/_/viewer/*` are deliberately absent. Publishing a FOLDER is something
+          this product no longer does — the public manual is Kiwi's, embedded — and the file endpoints
+          are mid-migration, so their public screens are unported rather than half-ported. */}
+      {/* The manual: public, anonymous, read out of Kiwi through this backend as a granted consumer, and
+          addressed by the permanent address so a link keeps working. ⚠️ It stays that way permanently —
+          those addresses live in Kiwi and are not moving here. */}
       <Route path="/manual" element={<ManualPage />} />
       <Route path="/manual/:address" element={<ManualPage />} />
       <Route path="/_/form/:shareToken" element={<PublicFormPage />} />
       <Route path="/_/form/:shareToken/embed" element={<EmbedFormPage />} />
       <Route path="/_/entry/:shareToken" element={<PublicEntryPage />} />
+      {/* A page published out of THIS product's store — a different thing from a manual page, and the
+          address `publicPageUrl` mints. */}
+      <Route path="/_/page/:shareToken" element={<PublicPageView />} />
 
       <Route
         element={
@@ -97,10 +109,22 @@ export function ApplicationRoutes() {
           </ProtectedRoute>
         }
       >
+        {/* ⚠️ **A station is inside the gate and OUTSIDE the layout, deliberately.** Launched from a
+            home screen it has no browser chrome to lean on and carries its own; the sidebar and the
+            workspace switcher a desktop screen sits inside would be most of a phone's height spent on
+            somewhere else. It stays inside the gate because it still needs to know which workspaces
+            the reader can reach — a station opens inside one.
+
+            ⚠️ And the address is a REAL entry, not only a route: `/station/components` is its own
+            document in the build so it can carry its own manifest. A route here without that entry
+            renders the right screen under the shell's installable identity. */}
+        <Route path="/station/:stationKey" element={<StationPage />} />
+
         <Route element={<ApplicationLayout />}>
           <Route path="/hub" element={<HubPage />} />
           <Route path="/assistant" element={<AssistantPage />} />
           <Route path="/bug-report" element={<BugReportPage />} />
+          <Route path="/stations" element={<StationsPage />} />
           {/* ⚠️ No permission and no data — the kit renders itself, so it answers with the backend down. */}
           <Route path="/ui-kit" element={<UiKitPage />} />
           <Route path="/settings/appearance" element={<AppearanceSettingsPage />} />
@@ -112,6 +136,7 @@ export function ApplicationRoutes() {
           <Route path="/admin/plans" element={<PlanAdministrationPage />} />
           <Route path="/purposes" element={<PurposesPage />} />
           <Route path="/admin/invitations" element={<InvitationsPage />} />
+          <Route path="/admin/crafts" element={<CraftsPage />} />
           <Route path="/admin/settings" element={<SystemSettingsPage />} />
           <Route path="/admin/ai" element={<AiAdministrationPage />} />
           <Route path="/admin/shares" element={<SharingPage />} />
@@ -124,12 +149,30 @@ export function ApplicationRoutes() {
 
           {/* ⚠️ Before the catch-all below: a real screen has to out-rank the section placeholder, and
               react-router picks the more specific path only if it is declared. */}
+          {/* ⚠️ Before the builder's route: `manage` is a real screen, and a dynamic `:formId` would
+              otherwise swallow it and open the builder for a form whose id is the word "manage". */}
+          <Route path={`${SPACE_ROUTE_ROOT}/:spaceSlug/forms/:formId/manage`} element={<FormManagementPage />} />
           <Route path={`${SPACE_ROUTE_ROOT}/:spaceSlug/forms/:formId`} element={<FormBuilderPage />} />
+          {/* ⚠️ A field has an address of its own again, as it did in the old interface — openable in
+              a tab, linkable, and the destination a phone gets instead of expanding a row in place.
+              It has to out-rank the section catch-all below, which would read `fields/{id}` as a
+              section nobody has built. */}
+          <Route path={`${SPACE_ROUTE_ROOT}/:spaceSlug/fields/:fieldId`} element={<FieldDetailPage />} />
           <Route path={`${SPACE_ROUTE_ROOT}/:spaceSlug/projects/:projectId`} element={<ProjectDetailPage />} />
 
           {/* ⚠️ Before the section catch-all: the studio is a screen of its own, not a section, and
               `labels/:templateId` would otherwise be read as a section named `labels/…`. */}
+          {/* ⚠️ A workspace route, NOT a platform one. A saved view belongs to the workspace, and the
+              active workspace here is derived from the ADDRESS — the store keeps only the last slug
+              visited. On `/saved-views` there was therefore no workspace by construction, so the forms
+              half of the page was empty and said nothing about why. */}
+          <Route path={`${SPACE_ROUTE_ROOT}/:spaceSlug/saved-views`} element={<SavedViewsPage />} />
           <Route path={`${SPACE_ROUTE_ROOT}/:spaceSlug/labels/:templateId`} element={<LabelStudioPage />} />
+
+          {/* ⚠️ Before the section catch-all, for the same reason as the two above: `pages/{id}` is a
+              document, and the catch-all would read it as a section named `pages/…`. The section
+              itself — the library at `pages` — is still served by the catch-all. */}
+          <Route path={`${SPACE_ROUTE_ROOT}/:spaceSlug/pages/:pageId`} element={<PageDetailPage />} />
 
           {/* ⚠️ **Two addresses for one page, and both are kept.** A row reached from the stock screen and
               a row reached from a parametric match are the same record; the older interface minted both

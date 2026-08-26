@@ -115,18 +115,6 @@ export interface SpaceDetail {
   discoverable: boolean
   subjectAreaCode: string
   subjectAreaLabel: string
-  /**
-   * The workspace's branch of **Kiwi's** tree, or null where nobody has chosen one (INVT-0120).
-   *
-   * ⚠️ **Null is a sentence, not a blank pane.** "No wiki configured" is a different thing from "Kiwi is
-   * unreachable" and from "nothing has been shared with you"; drawing one grey box for all three is the
-   * plausible lie `KW-1` §12 warns about.
-   *
-   * ⚠️ **And it arrives as `undefined`, not `null`** — the backend serialises with non_null, so an
-   * unset column is omitted from the payload entirely. Every `=== null` test against it is silently
-   * false forever; normalise with `?? null` at the boundary rather than testing loosely everywhere.
-   */
-  kiwiRootCategoryId: string | null | undefined
   members: SpaceMember[]
   currentUserRole: SpaceMemberRole
   createdAt: string
@@ -158,14 +146,11 @@ export const spaceSettingsApi = {
 
   update: (
     spaceId: string,
-    // ⚠️ `kiwiRootCategoryId: ""` CLEARS it; omitting the key leaves it alone. Every other field here
-    // reads absent as unchanged, which works because none of them can be unset — this one can.
     payload: {
       name?: string
       description?: string
       discoverable?: boolean
       subjectAreaCode?: string
-      kiwiRootCategoryId?: string
     },
   ) => http.patch<SpaceDetail>(`/spaces/${spaceId}`, payload),
 

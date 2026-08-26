@@ -2,7 +2,6 @@ import { DangerZoneSection } from "./DangerZoneSection"
 import { FormsSection } from "./FormsSection"
 import { IdentitySection } from "./IdentitySection"
 import { MembersSection } from "./MembersSection"
-import { WikiSection } from "./WikiSection"
 import { WordsSection } from "./WordsSection"
 import { ModulesSection } from "./ModulesSection"
 import type { SpaceSettingsSection } from "./SpaceSettingsSection"
@@ -33,11 +32,6 @@ export const SPACE_SETTINGS_SECTIONS: SpaceSettingsSection[] = [
   // ⚠️ No `visible` gate and no module: every screen in the workspace READS these words, so a member
   // who cannot change them still needs to see which ones are in force — the controls disable instead.
   { key: "words", label: "Words", glyph: "⌶", Component: WordsSection },
-
-  // ⚠️ Bound to the pages module, so a workspace that switched Pages off does not carry a setting for a
-  // screen it does not have. No further gate: a member who cannot change the branch still deserves to
-  // read which one this workspace points at, and why their tree looks empty.
-  { key: "wiki", label: "Wiki", glyph: "▦", module: "pages", Component: WikiSection },
 
   // Editing which forms a workspace shows has nothing to read — the list is the control — so this one
   // genuinely does disappear for somebody who cannot change it.

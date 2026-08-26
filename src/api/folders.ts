@@ -7,17 +7,22 @@ import { http } from "./http"
  * two trees have nothing to do with each other. A form's category is a heading under a purpose; this is
  * a folder somebody files a document into.
  *
- * ⚠️ **Files only, since INVT-0099.** The tree used to hold pages as well, and sharing a folder
- * published that subtree publicly. Pages are Kiwi's now and it does its own sharing under its own
- * grants, so the share was deleted rather than left minting tokens that resolve to nothing.
+ * ⚠️ **Pages only.** Files left for the library's own directory tree, which is a different thing that
+ * happens to be drawn as folders too — one tree meaning "somewhere a page lives" and "somewhere bytes
+ * live" at once is one tree answering to two access rules.
+ *
+ * ⚠️ **Folder sharing is not here**, and its absence is deliberate rather than pending. Publishing a
+ * subtree to anonymous readers is what the public manual does, and the manual is served by Kiwi through
+ * an embed. A share minted here would resolve to nothing.
  */
 
 /**
  * The kinds of thing filed into a {@link Category}.
  *
- * ⚠️ **`PAGE` is gone** — this product files no pages any more (INVT-0099).
+ * ⚠️ **One value, and the column is still polymorphic.** A second kind is a foreseeable thing to file —
+ * a form, a project — and re-introducing a discriminator costs more than keeping one.
  */
-export type CategoryEntityType = "FILE"
+export type CategoryEntityType = "PAGE"
 
 /** A folder in the shared, owner-scoped tree. ⚠️ Arrives in nested-set order — the list *is* the tree. */
 export interface Category {

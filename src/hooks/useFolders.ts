@@ -7,8 +7,9 @@ import { foldersApi, type Category, type CategoryEntityType } from "@/api/folder
  * ⚠️ **A folder belongs to its owner, not to a workspace** — which is why nothing here is keyed by the
  * active workspace, and why switching workspace does not refetch.
  *
- * ⚠️ **Files only, since INVT-0099** — pages left this product for Kiwi, and folder sharing left with
- * them rather than staying to mint tokens that resolve to nothing.
+ * ⚠️ **Pages only** — files are filed into the library's own directory tree, and folder sharing is not
+ * here at all: the public manual is published by Kiwi through an embed, so a share minted here would
+ * resolve to nothing.
  */
 const FOLDER_KEYS = {
   all: ["folders"] as const,
