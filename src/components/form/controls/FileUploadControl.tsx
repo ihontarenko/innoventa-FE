@@ -1,13 +1,12 @@
-import { useRef, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { ExternalLink, FolderOpen, Upload, X } from "lucide-react"
-import { Button, cn } from "@jmouse/ui"
+import { Button, ImageCropperDialog, cn, isCroppableImage } from "@jmouse/ui"
 import { composeFileFieldValue, fileLinks, parseFileFieldValue } from "@/api/files"
-import { extensionForFormat, imageProcessingOf } from "@/lib/imageProcessing"
+import { cropSpecificationFor, imageProcessingOf } from "@/lib/imageProcessing"
 import { useUploadFile } from "@/hooks/useFiles"
 import { useUploadDestination } from "@/components/form/UploadDestination"
 import { usePublicConfiguration } from "@/hooks/useSystemSettings"
 import { ExistingFilePicker } from "./ExistingFilePicker"
-import { ImageCropDialog } from "./ImageCropDialog"
 import type { ControlProperties } from "./types"
 
 /**
@@ -38,11 +37,27 @@ export function FileUploadControl({ field, value, onChange, hasError, acceptImag
   const [progress, setProgress] = useState<number | null>(null)
   const [error, setError] = useState("")
   const [isPicking, setPicking] = useState(false)
-  const [cropSource, setCropSource] = useState<string | null>(null)
-  const [cropFilename, setCropFilename] = useState("")
+
+  /**
+   * The picture waiting to be framed.
+   *
+   * ⚠️ **The file itself, not an object URL of it.** The cropper decodes and releases what it is
+   * given, so handing it the file removes the revoke this component used to have to remember — and it
+   * means the crop comes back named after the original with the encoded format's extension, rather
+   * than as something this component has to rebuild the name for.
+   */
+  const [cropping, setCropping] = useState<File | null>(null)
 
   const maximumMegabytes = Number.parseInt(publicConfig?.["files.max_size_mb"] ?? "50", 10)
   const processing = imageProcessingOf(field.configs)
+
+  // Held steady across renders: the cropper re-derives its frame from whatever specification it is
+  // handed, so a fresh object every render is a frame that never settles.
+  const cropSpecification = useMemo(
+    () => (cropping ? cropSpecificationFor(processing, cropping) : undefined),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the picture and the four values are the identity here
+    [cropping, processing.maxWidth, processing.maxHeight, processing.format, processing.quality],
+  )
 
   const reference = parseFileFieldValue(value)
   const filename = reference ? reference.filename : value
@@ -95,9 +110,16 @@ export function FileUploadControl({ field, value, onChange, hasError, acceptImag
 
     setError("")
 
-    if (processing.crop && chosen.type.startsWith("image/")) {
-      setCropSource(URL.createObjectURL(chosen))
-      setCropFilename(chosen.name)
+    // ⚠️ **Every picture on every dynamic form, not only a field that was configured for it.** There
+    // is one `DynamicForm` behind the entry dialogs, the public form, the embed and the builder's
+    // preview, so this branch is the whole product's answer to "may I frame this before it goes up" —
+    // and `image.crop` has a control on no screen, so waiting to be asked meant never being asked.
+    // `required` is the field insisting; silence is the offer; `off` is the field opting out.
+    //
+    // ⚠️ Gated on `isCroppableImage`, not on `image/`: SVG passes the second test and must never take
+    // this branch, because framing it means handing back a raster of the one thing that was not one.
+    if (processing.crop !== "off" && isCroppableImage(chosen)) {
+      setCropping(chosen)
 
       if (inputReference.current) {
         inputReference.current.value = ""
@@ -107,15 +129,6 @@ export function FileUploadControl({ field, value, onChange, hasError, acceptImag
     }
 
     void uploadBlob(chosen, chosen.name)
-  }
-
-  function closeCrop() {
-    if (cropSource) {
-      URL.revokeObjectURL(cropSource)
-    }
-
-    setCropSource(null)
-    setCropFilename("")
   }
 
   if (reference) {
@@ -192,19 +205,35 @@ export function FileUploadControl({ field, value, onChange, hasError, acceptImag
 
       {error && <span className="text-xs text-destructive">{error}</span>}
 
-      {cropSource && (
-        <ImageCropDialog
-          source={cropSource}
-          processing={processing}
-          onCancel={closeCrop}
-          onCropped={(blob) => {
-            const name = cropFilename.replace(/\.[^.]+$/, extensionForFormat(processing.format))
+      {/* ⚠️ The description is left to the dialog in both cases: it says what the result will be saved
+          at, read from the field's own configuration, and that is the one fact that changes how
+          generously somebody frames a picture. */}
+      <ImageCropperDialog
+        open={cropping !== null}
+        onOpenChange={(next) => !next && setCropping(null)}
+        source={cropping}
+        specification={cropSpecification}
+        skippable={processing.crop === "offered"}
+        busy={progress !== null}
+        onCropped={(cropped) => {
+          setCropping(null)
+          void uploadBlob(cropped, cropped.name)
+        }}
+        onSkipped={() => {
+          const original = cropping
 
-            closeCrop()
-            void uploadBlob(blob, name)
-          }}
-        />
-      )}
+          setCropping(null)
+
+          if (original) {
+            void uploadBlob(original, original.name)
+          }
+        }}
+        labels={
+          processing.crop === "required"
+            ? { title: "Crop the image" }
+            : { title: "Trim the picture?", confirm: "Upload this crop", skip: "Upload as it is" }
+        }
+      />
 
       {isPicking && (
         <ExistingFilePicker

@@ -1,42 +1,37 @@
+import { keepingFormatOf, type ImageCropSpecification, type ImageFormat } from "@jmouse/ui"
+
 /**
- * Turning a chosen region of an image into the bytes that get uploaded.
+ * What a field asks of a picture, and how that reaches the shared cropper.
  *
- * ⚠️ **The crop happens in the browser, before the upload.** That is what makes the field's
- * `image.max_width` / `image.max_height` configuration mean something — the server stores what it is
- * given, so an uncropped upload is an uncropped image forever.
+ * ⚠️ **Reading a field's configuration is Innoventa's, cropping is not.** The `image.*` keys are this
+ * product's vocabulary — a form builder writes them, nothing else in the workspace has them — so
+ * translating them lives here. The cropping itself is `@jmouse/ui`'s `ImageCropper`, which three
+ * products share; this file is the adapter between the two and holds no canvas code at all.
+ *
+ * ⚠️ **The crop happens in the browser, before the upload.** That is what makes `image.max_width` /
+ * `image.max_height` mean something — the server stores what it is given, so an uncropped upload is an
+ * uncropped image forever.
  */
 
-export interface CropArea {
-  x: number
-  y: number
-  width: number
-  height: number
-}
-
-const FORMAT_MIME: Record<string, string> = {
-  jpeg: "image/jpeg",
-  jpg: "image/jpeg",
-  webp: "image/webp",
-  png: "image/png",
-}
-
-const FORMAT_EXTENSION: Record<string, string> = {
-  jpeg: ".jpg",
-  jpg: ".jpg",
-  webp: ".webp",
-  png: ".png",
-}
-
-export function extensionForFormat(format: string): string {
-  return FORMAT_EXTENSION[format.toLowerCase()] ?? ".jpg"
-}
+/**
+ * Whether a picture is framed on its way into a field, and whether the person may decline.
+ *
+ * ⚠️ **`offered` is the default, and that is the whole point of the three states.** `image.crop` is set
+ * on no field in this installation and has a control on no screen — it can only be typed into the
+ * field editor's raw key/value map — so a two-state flag defaulting to off meant every dynamic form in
+ * the product silently had no cropper at all. A picture somebody attaches to a form is a picture they
+ * may want to trim; the offer costs one dismissible dialog and is skippable, and the original goes up
+ * untouched when it is skipped.
+ */
+export type CropDemand = "required" | "offered" | "off"
 
 /** The image configuration a field carries, read from its `configs` map. */
 export interface ImageProcessing {
-  crop: boolean
+  crop: CropDemand
   maxWidth: number | null
   maxHeight: number | null
-  format: string
+  /** ⚠️ `null` means the field named none — which is not the same as naming JPEG. */
+  format: string | null
   quality: number
 }
 
@@ -50,56 +45,72 @@ export function imageProcessingOf(configs: Record<string, string>): ImageProcess
   const quality = Number.parseFloat(configs["image.quality"] ?? "")
 
   return {
-    crop: configs["image.crop"] === "true",
+    crop: cropDemandOf(configs["image.crop"]),
     maxWidth: asInteger("image.max_width"),
     maxHeight: asInteger("image.max_height"),
-    format: (configs["image.format"] ?? "jpeg").toLowerCase(),
+    format: configs["image.format"]?.toLowerCase() || null,
     quality: Number.isNaN(quality) ? 0.92 : quality,
   }
 }
 
 /**
- * @param outputWidth  the size to scale the crop to — the field's configured maximum, or the crop's
- *                     own size when it has none
- *
- * ⚠️ **Quality is omitted for PNG**, which is lossless: passing one makes some browsers silently
- * re-encode to a different format instead of ignoring it.
+ * ⚠️ **`false` still means no crop step at all**, which is the promise this key made before it had
+ * three states: a field configured to skip the framing keeps skipping it. What changed is what
+ * *silence* means — it used to mean the same as `false`, and now it means the offer.
  */
-export async function croppedBlobOf(
-  imageSource: string,
-  cropArea: CropArea,
-  { maxWidth, maxHeight, format, quality }: Pick<ImageProcessing, "maxWidth" | "maxHeight" | "format" | "quality">,
-): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const image = new Image()
+function cropDemandOf(configured: string | undefined): CropDemand {
+  if (configured === "true" || configured === "required") {
+    return "required"
+  }
 
-    image.onload = () => {
-      const canvasWidth = maxWidth ?? cropArea.width
-      const canvasHeight = maxHeight ?? cropArea.height
-      const canvas = document.createElement("canvas")
+  if (configured === "false" || configured === "off") {
+    return "off"
+  }
 
-      canvas.width = canvasWidth
-      canvas.height = canvasHeight
+  return "offered"
+}
 
-      const context = canvas.getContext("2d")
+/**
+ * The field's values, said in the cropper's own vocabulary.
+ *
+ * ⚠️ **The ratio is not passed and that is deliberate.** `cropSpecificationOf` derives it from the two
+ * output dimensions when both are given — a field configured for 400×300 thumbnails cannot then be
+ * handed a portrait region that every screen would squash. A field naming only one dimension, or
+ * neither, gets a frame the picture's own shape, which is the honest default when nobody said.
+ *
+ * ⚠️ **A field that names no format keeps the picture's own.** Re-encoding is a change the person
+ * accepting a crop did not ask for and cannot see: a 400 kB JPEG photograph arriving as a
+ * six-megabyte PNG, or a screenshot's flat colour arriving with JPEG ringing around every letter. Only
+ * an explicit `image.format` overrides what was uploaded.
+ */
+export function cropSpecificationFor(
+  processing: ImageProcessing,
+  picture: File,
+): Partial<ImageCropSpecification> {
+  const asked: Partial<ImageCropSpecification> = {
+    shape: "rectangle",
+    outputWidth: processing.maxWidth,
+    outputHeight: processing.maxHeight,
+    quality: processing.quality,
+  }
 
-      if (!context) {
-        reject(new Error("Canvas context unavailable"))
-        return
-      }
+  if (processing.format) {
+    return { ...asked, format: formatOf(processing.format) }
+  }
 
-      context.drawImage(image, cropArea.x, cropArea.y, cropArea.width, cropArea.height, 0, 0, canvasWidth, canvasHeight)
+  // PNG rather than JPEG for a source the cropper cannot write back — a GIF, an AVIF — because those
+  // are as likely to be flat colour as a photograph, and PNG is the one that does not ruin either.
+  return keepingFormatOf(picture, { ...asked, format: "png" })
+}
 
-      const mimeType = FORMAT_MIME[format] ?? "image/jpeg"
+const FORMATS: Record<string, ImageFormat> = {
+  jpeg: "jpeg",
+  jpg: "jpeg",
+  png: "png",
+  webp: "webp",
+}
 
-      canvas.toBlob(
-        (blob) => (blob ? resolve(blob) : reject(new Error("Canvas produced no image"))),
-        mimeType,
-        format === "png" ? undefined : quality,
-      )
-    }
-
-    image.onerror = () => reject(new Error("That image could not be read"))
-    image.src = imageSource
-  })
+/** An unrecognised `image.format` becomes JPEG, which is what the field's own default already was. */
+function formatOf(format: string): ImageFormat {
+  return FORMATS[format] ?? "jpeg"
 }

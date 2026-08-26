@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { ImageUp } from "lucide-react"
 import { toast } from "sonner"
 import { AvatarPickerDialog as SharedAvatarPickerDialog, type AvatarChoice } from "@jmouse/avatars/picker"
-import { ImageSquareCropper, type CropperHandle } from "@/components/account/ImageSquareCropper"
+import { AVATAR_CROP, ImageCropper, type ImageCropperHandle } from "@jmouse/ui"
 import { avatarActions } from "@/api/avatarActions"
 import { useProfile } from "@/hooks/useProfile"
 import { detailOf } from "@/lib/apiErrors"
@@ -11,10 +11,12 @@ import { detailOf } from "@/lib/apiErrors"
 /**
  * Choosing a face — the half only Innoventa can do.
  *
- * ⚠️ **The dialog itself lives in `@jmouse/avatars/picker`.** What was here was 248 lines, of which the
- * face grid, the source switch and the chrome were the same as Tessera's and Kiwi's — three copies that
- * had already started to drift. What stayed is everything the shared one cannot know: this product's
- * routes, its error shape, its cache invalidation, and its own cropper.
+ * ⚠️ **The dialog itself lives in `@jmouse/avatars/picker`, and the cropper in `@jmouse/ui`.** What was
+ * here was 248 lines, of which the face grid, the source switch and the chrome were the same as
+ * Tessera's and Kiwi's — three copies that had already started to drift. The cropper was the last of
+ * them to go, and it was the worst: 345 lines byte-identical in three products. What stays is
+ * everything a shared part cannot know — this product's routes, its error shape and its cache
+ * invalidation.
  *
  * ⚠️ **`BOUNDED_DIALOG` is gone from here and that is not a loss.** The shared dialog bounds itself and
  * scrolls its own body, because the argument that component makes is true of every product showing a
@@ -33,7 +35,7 @@ export function AvatarPickerDialog({
 
   const [picture, setPicture] = useState<File | null>(null)
 
-  const cropper = useRef<CropperHandle>(null)
+  const cropper = useRef<ImageCropperHandle>(null)
   const fileInput = useRef<HTMLInputElement>(null)
 
   const settled = () => {
@@ -93,7 +95,7 @@ export function AvatarPickerDialog({
     }
 
     try {
-      savePicture.mutate(await cropper.current.toSquarePng())
+      savePicture.mutate(await cropper.current.toBlob())
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "That picture could not be cropped.")
     }
@@ -111,7 +113,13 @@ export function AvatarPickerDialog({
       pictureSource={
         <div className="space-y-3">
           {picture ? (
-            <ImageSquareCropper ref={cropper} file={picture} onDiscard={() => setPicture(null)} />
+            <ImageCropper
+              ref={cropper}
+              source={picture}
+              specification={AVATAR_CROP}
+              stageHeight={260}
+              onDiscard={() => setPicture(null)}
+            />
           ) : (
             <button
               type="button"
