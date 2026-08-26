@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { toast } from "sonner"
 import {
   Badge,
@@ -84,11 +84,24 @@ export function LocationsPage() {
 
   const { data: tree = [], isLoading } = useStorageLocations()
 
+  const [parameters, setParameters] = useSearchParams()
+
   const createLocation = useCreateLocation()
   const updateLocation = useUpdateLocation()
   const deleteLocation = useDeleteLocation()
 
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  /**
+   * Which place is open, kept in the ADDRESS.
+   *
+   * ⚠️ **A selection in local state is a selection nothing can link to.** A record says where it is
+   * kept; pressing that has to arrive at the place itself, not at the tree with nothing chosen. Held
+   * here it is also pasteable, which is the same reason a record has a page of its own.
+   */
+  const selectedId = parameters.get("location")
+  const setSelectedId = (locationId: string | null) => {
+    /* ⚠️ `replace`, so walking a tree does not fill the Back button with every node touched on the way. */
+    setParameters(locationId ? { location: locationId } : {}, { replace: true })
+  }
   const [draft, setDraft] = useState<Draft | null>(null)
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [search, setSearch] = useState("")

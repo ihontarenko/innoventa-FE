@@ -21,6 +21,7 @@ import {
 import { useForm } from "@/hooks/useForms"
 import { useSpaces } from "@/hooks/useSpaces"
 import { relativeTime, readableMoment } from "@/lib/dates"
+import { spaceSectionPath } from "@/lib/navigationContext"
 import { useSpaceStore } from "@/stores/spaceStore"
 import type { FormEntry } from "@/types"
 
@@ -43,6 +44,7 @@ const LIVE_INTERVAL_MILLISECONDS = 10_000
  */
 export function ResultsPage() {
   const activeSpaceId = useSpaceStore((state) => state.activeSpaceId)
+  const activeSpaceSlug = useSpaceStore((state) => state.activeSpaceSlug)
 
   /**
    * ⚠️ **One form, when the address names one.** This screen is per PURPOSE, which is right for reading
@@ -324,6 +326,14 @@ export function ResultsPage() {
           formId={openEntry.formId}
           formName={openEntry.formName}
           entry={openEntry}
+          /* ⚠️ Centred, like every other list in this product now — a result is read, and the two things
+             that reading turns into are the buttons in the footer rather than a caption by the ✕. */
+          container="dialog"
+          permalink={
+            activeSpaceSlug
+              ? spaceSectionPath(activeSpaceSlug, `entry/${openEntry.formId}/${openEntry.id}`)
+              : undefined
+          }
           isSubmitting={updateEntry.isPending}
           onSubmit={async (fieldValues) => {
             await updateEntry.mutateAsync({ formId: openEntry.formId, entryId: openEntry.id, fieldValues })

@@ -21,6 +21,7 @@ export const FORM_CONFIG_KEYS = {
   SORT_DIRECTION: "display.sort_default_direction",
   STOCK_QUANTITY_FIELD: "stock.quantity_field",
   STOCK_THRESHOLD_FIELD: "stock.threshold_field",
+  STOCK_LOCATION_FIELD: "stock.location_field",
   PRICE_FIELD: "pricing.price_field",
   UNIQUE_FIELD: "validation.unique_field",
 
@@ -73,6 +74,8 @@ export interface FormConfigs {
   tableColumns: string[]
   stockQuantityField: string | null
   stockThresholdField: string | null
+  /** Where the thing is. Points at a field, which may itself be sourced from the Locations catalogue. */
+  stockLocationField: string | null
   priceField: string | null
   /** Whether anything at all has been said about how to display this form. */
   hasDisplayConfig: boolean
@@ -113,6 +116,7 @@ export function readFormConfigs(values: Record<string, string> | null | undefine
     tableColumns: nameList(map[FORM_CONFIG_KEYS.TABLE_COLUMNS]),
     stockQuantityField: text(FORM_CONFIG_KEYS.STOCK_QUANTITY_FIELD),
     stockThresholdField: text(FORM_CONFIG_KEYS.STOCK_THRESHOLD_FIELD),
+    stockLocationField: text(FORM_CONFIG_KEYS.STOCK_LOCATION_FIELD),
     priceField: text(FORM_CONFIG_KEYS.PRICE_FIELD),
     hasDisplayConfig: !!primaryField || !!secondaryField || !!imageField || priorityFields.length > 0,
     submission: {

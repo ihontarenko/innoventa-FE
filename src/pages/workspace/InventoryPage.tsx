@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { Link, useSearchParams } from "react-router-dom"
 import { useQueries, useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
+import { ArrowUpRight, Pencil } from "lucide-react"
 import { Badge, Button, type FilterItem, FilterPanel, Input, Skeleton, cn } from "@jmouse/ui"
 import { LevelDoor, LevelDoors } from "@/components/LevelDoor"
 import { PageHeader } from "@/components/PageHeader"
@@ -102,9 +104,53 @@ export function InventoryPage({
     .filter((face) => face.section !== section)
     .map((face) => ({ label: face.label, to: spaceSlug ? spaceSectionPath(spaceSlug, face.section) : "" }))
 
-  const [selectedFormId, setSelectedFormId] = useState<string | null>(null)
-  const [search, setSearch] = useState("")
-  const [page, setPage] = useState(0)
+  /**
+   * Which type is open, what was typed, and which page — **in the address**.
+   *
+   * ⚠️ **This is what makes Back work, and the Back button was never the problem.** These three lived in
+   * `useState`, so every address for this screen was the same address: leaving for a record and coming
+   * back landed on *All types*, page one, nothing typed. It read as a broken button and was a screen
+   * that had never written down where somebody was.
+   *
+   * ⚠️ **And it makes the list quotable.** "The resistors, page three" is now something to paste into a
+   * message, exactly as one record already was.
+   *
+   * ⚠️ **The page is 1-based in the address and 0-based in the code.** `?page=1` is the first page to
+   * everybody who is not a programmer, and it is omitted rather than written — an address carrying
+   * `?page=1&q=` says a filter is on when none is.
+   */
+  const [parameters, setParameters] = useSearchParams()
+
+  const selectedFormId = parameters.get("type")
+  const search = parameters.get("q") ?? ""
+  const numberedPage = Number.parseInt(parameters.get("page") ?? "", 10)
+  const page = Number.isFinite(numberedPage) && numberedPage > 1 ? numberedPage - 1 : 0
+
+  /**
+   * ⚠️ **One write for however many keys change.** Two `setParameters` calls in a row both read the
+   * same stale `parameters`, so the second silently undoes the first — which is exactly what happens
+   * when picking a type also has to reset the page.
+   *
+   * ⚠️ **`replace` by default.** Typing pushes a history entry per keystroke otherwise, and Back then
+   * walks backwards through a search term one letter at a time instead of leaving the screen. Choosing
+   * a type is the one deliberate move here, so that one pushes.
+   */
+  function amend(changes: Record<string, string | null>, options?: { push?: boolean }) {
+    const next = new URLSearchParams(parameters)
+
+    for (const [key, value] of Object.entries(changes)) {
+      if (value === null || value === "") {
+        next.delete(key)
+      } else {
+        next.set(key, value)
+      }
+    }
+
+    setParameters(next, { replace: !options?.push })
+  }
+
+  const setPage = (next: number) => amend({ page: next <= 0 ? null : String(next + 1) })
+
   const [jmq, setJmq] = useState<AppliedQuery>({})
   const [composing, setComposing] = useState(false)
   const [editing, setEditing] = useState<{
@@ -114,6 +160,21 @@ export function InventoryPage({
     initialValues?: Record<string, string>
     /** What those seeded answers are called, for the fields whose choices come from a source. */
     initialOptionLabels?: Record<string, Record<string, string>>
+    /**
+     * Opened by a control that says *edit*, so it opens centred and already in the editor.
+     *
+     * ⚠️ **Set only by the row's own Edit button.** A row click goes to the record's page now; the
+     * drawer is no longer what a list opens, so the one thing left that opens a form over this screen
+     * is a control that announced it would.
+     */
+    asEditor?: boolean
+    /**
+     * Opened by a row click: centred, and showing the record rather than the form.
+     *
+     * ⚠️ **Told apart from `asEditor` because the two are different acts**, even though both are
+     * modals — one is a glance somebody carries on from, the other is a change they came to make.
+     */
+    asPreview?: boolean
   } | null>(null)
   const [activeViewId, setActiveViewId] = useState<string | null>(null)
 
@@ -135,10 +196,26 @@ export function InventoryPage({
    */
   const allTypesLabel = companionPurposeCodes.length > 0 ? `All ${noun}s` : "All types"
 
-  // A workspace switch has to forget which type was open — the id belongs to the workspace we left.
+  /**
+   * A workspace switch has to forget which type was open — the id belongs to the workspace we left, and
+   * so does anything typed about it.
+   *
+   * ⚠️ **Only on a CHANGE, never on the first run — and the difference used to be invisible.** While
+   * these lived in `useState` the effect cleared values that were already empty, so firing on mount cost
+   * nothing. Now they come from the address, and clearing on mount wipes the very `?type=` somebody just
+   * came back to: Back appeared to land on *All types* again, for a completely different reason than the
+   * one that was just fixed.
+   */
+  const lastSpaceId = useRef(activeSpaceId)
+
   useEffect(() => {
-    setSelectedFormId(null)
-    setPage(0)
+    if (lastSpaceId.current === activeSpaceId) {
+      return
+    }
+
+    lastSpaceId.current = activeSpaceId
+    amend({ type: null, page: null, q: null })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSpaceId])
 
   const isAllTypes = selectedFormId === null
@@ -259,16 +336,14 @@ export function InventoryPage({
   }))
 
   function select(formId: string | null) {
-    setSelectedFormId(formId)
-    setPage(0)
+    // ⚠️ Pushed, not replaced: picking a type is a move somebody may want to take back.
+    amend({ type: formId, page: null }, { push: true })
     // Narrowing by hand un-claims the view: the filter is no longer what it stored.
     setActiveViewId(null)
   }
 
   useViewFromAddress<{ formId?: string | null; search?: string }>(section, (applied, viewId) => {
-    setSelectedFormId(applied.formId ?? null)
-    setSearch(applied.search ?? "")
-    setPage(0)
+    amend({ type: applied.formId ?? null, q: applied.search ?? null, page: null })
     setActiveViewId(viewId)
   })
 
@@ -295,8 +370,8 @@ export function InventoryPage({
               value={search}
               placeholder={`Search every ${noun}…`}
               onChange={(event) => {
-                setSearch(event.target.value)
-                setPage(0)
+                // One write: typing also returns to the first page, and two calls would fight.
+                amend({ q: event.target.value, page: null })
                 setActiveViewId(null)
               }}
             />
@@ -373,9 +448,7 @@ export function InventoryPage({
             isFiltered={Boolean(selectedFormId || search.trim())}
             activeViewId={activeViewId}
             onApply={(applied, viewId) => {
-              setSelectedFormId(applied.formId ?? null)
-              setSearch(applied.search ?? "")
-              setPage(0)
+              amend({ type: applied.formId ?? null, q: applied.search ?? null, page: null })
               setActiveViewId(viewId)
             }}
           />
@@ -463,7 +536,11 @@ export function InventoryPage({
                   forms={forms}
                   details={details}
                   activeForm={activeForm}
-                  onOpen={(entry) => setEditing({ entry, formId: entry.formId })}
+                  pageOf={(entry) =>
+                    spaceSlug ? spaceSectionPath(spaceSlug, `entry/${entry.formId}/${entry.id}`) : null
+                  }
+                  onPreview={(entry) => setEditing({ entry, formId: entry.formId, asPreview: true })}
+                  onEdit={(entry) => setEditing({ entry, formId: entry.formId, asEditor: true })}
                 />
               )}
 
@@ -494,6 +571,11 @@ export function InventoryPage({
           initialValues={editing.initialValues}
           initialOptionLabels={editing.initialOptionLabels}
           isNew={!editing.entry}
+          /* ⚠️ Centred for both, but only Edit opens IN the editor — the row said Edit, so landing on
+             the record and asking somebody to press Edit again would be the screen ignoring what they
+             just pressed. A row click lands on the record, which is what it asked for. */
+          container={editing.asEditor || editing.asPreview ? "dialog" : undefined}
+          startInEdit={editing.asEditor}
           isSubmitting={createEntry.isPending || updateEntry.isPending}
           onSubmit={async (values) => {
             if (editing.entry) {
@@ -565,13 +647,31 @@ function EntriesTable({
   forms,
   details,
   activeForm,
-  onOpen,
+  pageOf,
+  onPreview,
+  onEdit,
 }: {
   entries: FormEntry[]
   forms: SpaceForm[]
   details: Record<string, FormDetail>
   activeForm: FormDetail | null
-  onOpen: (entry: FormEntry) => void
+  /**
+   * Where a row lives on its own — for the control that says so, not for the row itself.
+   *
+   * ⚠️ Answers `null` only while the workspace slug is still resolving, and a row with nowhere to go
+   * simply does not offer the control.
+   */
+  pageOf: (entry: FormEntry) => string | null
+  /**
+   * ⚠️ **A row click opens a PREVIEW, centred, and neither edits nor navigates.** Somebody scanning a
+   * list wants to look at a row and carry on scanning: a side panel left half the window showing a list
+   * nobody was reading, and going straight to the page threw the list away for a glance. The preview
+   * carries the two things that glance turns into — *Edit* and *Open in full page* — as buttons that
+   * say which is which.
+   */
+  onPreview: (entry: FormEntry) => void
+  /** ⚠️ Straight into the editor, because the control that opened it said Edit. */
+  onEdit: (entry: FormEntry) => void
 }) {
   const isAllTypes = !activeForm
   const configs = readFormConfigs(activeForm?.config)
@@ -613,6 +713,9 @@ function EntriesTable({
             ))}
             {isAllTypes && <th className="px-2.5 py-1.5 text-left font-medium">Entry</th>}
             <th className="px-2.5 py-1.5 text-left font-medium">Updated</th>
+            {/* ⚠️ Unlabelled on purpose — a column of controls is read by its buttons, and "Actions"
+                over two icons is a heading that describes the table rather than the data in it. */}
+            <th className="w-px px-2.5 py-1.5" />
           </tr>
         </thead>
 
@@ -628,12 +731,14 @@ function EntriesTable({
             const threshold = numberAt(entry, rowConfigs.stockThresholdField)
             const isLow = quantity !== null && threshold !== null && quantity < threshold
 
+            const page = pageOf(entry)
+
             return (
               <tr
                 key={entry.id}
-                onClick={() => onOpen(entry)}
+                onClick={() => onPreview(entry)}
                 className={cn(
-                  "cursor-pointer border-b transition-colors last:border-b-0 hover:bg-accent",
+                  "group cursor-pointer border-b transition-colors last:border-b-0 hover:bg-accent",
                   isLow && "border-l-2 border-l-destructive bg-destructive/5",
                 )}
               >
@@ -666,6 +771,33 @@ function EntriesTable({
                 )}
 
                 <td className="px-2.5 py-1.5 text-xs text-muted-foreground">{relativeTime(entry.updatedAt)}</td>
+
+                {/* ⚠️ **`stopPropagation`, or every control here also opens the page behind it.** The
+                    row is the link; these sit on top of it and mean something else. */}
+                <td className="px-2.5 py-1.5" onClick={(event) => event.stopPropagation()}>
+                  <div className="flex items-center justify-end gap-0.5">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      title="Edit this row"
+                      aria-label="Edit this row"
+                      onClick={() => onEdit(entry)}
+                    >
+                      <Pencil className="size-3.5" />
+                    </Button>
+
+                    {/* ⚠️ A real link, not a second way to fire the row's click. Middle-click and
+                        "open in a new tab" are how somebody compares two rows, and a handler that only
+                        calls `navigate` takes both away. */}
+                    {page && (
+                      <Button asChild variant="ghost" size="icon-sm">
+                        <Link to={page} title="Open its page" aria-label="Open its page">
+                          <ArrowUpRight className="size-3.5" />
+                        </Link>
+                      </Button>
+                    )}
+                  </div>
+                </td>
               </tr>
             )
           })}

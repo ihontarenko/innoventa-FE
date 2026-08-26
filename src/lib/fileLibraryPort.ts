@@ -78,10 +78,16 @@ export function innoventaFileLibrary(tokensByFileId: Map<string, string> = new M
       return token ? fileLinks.viewer(token) : null
     },
 
+    /*
+      ⚠️ **The branded page, not the bytes.** This answered `absoluteView` — `/_/file/{token}` — which is
+      the address an `<img>` or an embed points at. Handed to a person it drops them into a raw PDF with
+      no header, no name and no way back, while `openUrl` two seams above already used the viewer. One
+      file, two "where is it" answers that disagreed.
+    */
     shareUrl: (file) => {
       const token = tokenOf(file)
 
-      return token ? fileLinks.absoluteView(token) : null
+      return token ? fileLinks.absoluteViewer(token) : null
     },
   }
 }

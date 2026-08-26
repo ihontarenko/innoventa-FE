@@ -15,6 +15,8 @@ import {
 } from "@/hooks/useParametric"
 import { useEntry, useUpdateEntry } from "@/hooks/useWorkspaceForms"
 import { normalizeValueForUI } from "@/lib/fieldValues"
+import { spaceSectionPath } from "@/lib/navigationContext"
+import { useSpaceStore } from "@/stores/spaceStore"
 import type { ValueReading } from "@/api/parametric"
 
 /** Standard component tolerances, mirroring the real E-series grades a part is sold at. */
@@ -310,8 +312,12 @@ function Hint({ title, detail }: { title: string; detail: string }) {
 
 /**
  * ⚠️ **The match carries an entry's id and nothing else about it**, so the row has to be fetched before
- * it can be read. A drawer over the results keeps the search on screen, which is the point of opening
- * a match at all — somebody is comparing four of them.
+ * it can be read.
+ *
+ * ⚠️ **Centred, not at the edge — the same as every other list in this product now.** A panel at the
+ * edge left the results on screen at the cost of squeezing the record into a strip, and somebody
+ * comparing four matches is reading the record, not the list behind it. What they do next — open it
+ * properly, or change it — are the two buttons in the footer.
  */
 function MatchedEntryDrawer({
   formId,
@@ -322,6 +328,7 @@ function MatchedEntryDrawer({
   entryId: string
   onClose: () => void
 }) {
+  const spaceSlug = useSpaceStore((state) => state.activeSpaceSlug)
   const { data: entry } = useEntry(formId, entryId)
   const updateEntry = useUpdateEntry()
 
@@ -329,6 +336,8 @@ function MatchedEntryDrawer({
     <EntryDetailDrawer
       formId={formId}
       entry={entry}
+      container="dialog"
+      permalink={spaceSlug ? spaceSectionPath(spaceSlug, `entry/${formId}/${entryId}`) : undefined}
       isSubmitting={updateEntry.isPending}
       onSubmit={async (fieldValues) => {
         await updateEntry.mutateAsync({ formId, entryId, fieldValues })

@@ -104,7 +104,8 @@ export function ViewBar<Filter>({
           <span className="flex items-center gap-1">
             <Input
               autoFocus
-              className="h-6 w-44 text-xs"
+              size="sm"
+              className="w-44"
               placeholder="What is this view called?"
               value={name}
               onChange={(event) => setName(event.target.value)}
@@ -116,7 +117,6 @@ export function ViewBar<Filter>({
             />
             <Button
               size="sm"
-              className="h-6 px-2 text-xs"
               disabled={!name.trim() || save.isPending}
               onClick={() =>
                 save.mutate(
@@ -140,9 +140,19 @@ export function ViewBar<Filter>({
             </Button>
           </span>
         ) : (
+          /*
+            ⚠️ **The same 30px, the same radius and the same type as the chips beside it.** It was a
+            `rounded-full` pill at `py-0.5 text-[11px]` — half the height of the row it stood in, and a
+            different shape as well — so the one row on the screen whose whole job is to read as a set of
+            peers read as two unrelated things. `ToggleChip` carries the same note about the same mistake.
+
+            ⚠️ **The dashed border stays, because that difference carries meaning.** A chip is a view that
+            exists; this is an offer to make one. Dashed says *not a thing yet* without costing the row
+            its evenness — which is exactly what a radius and a height could not do.
+          */
           <button
             type="button"
-            className="rounded-full border border-dashed px-2 py-0.5 text-[11px] text-muted-foreground hover:text-foreground"
+            className="inline-flex h-[30px] items-center rounded-md border border-dashed px-3 text-[12.5px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             onClick={() => setNaming(true)}
           >
             + Save this view

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query"
 import { Skeleton } from "@jmouse/ui"
 import { PageMarkdown } from "@/components/markdown/PageMarkdown"
 import { publicShareSurface } from "@/components/markdown/surface"
+import { UNAVAILABLE_BLURB } from "@/components/public/PublicSurface"
 import { publicPagesApi } from "@/api/public"
 
 /**
@@ -52,7 +53,7 @@ export function PublicPageView() {
           </span>
           <span className="text-sm font-medium">This page is not available</span>
           <span className="text-muted-foreground max-w-md text-xs">
-            The link may have been turned off, or it may never have been public.
+            {UNAVAILABLE_BLURB}
           </span>
         </div>
       )}

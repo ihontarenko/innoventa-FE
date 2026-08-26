@@ -39,7 +39,19 @@ export function useViewFromAddress<Filter>(
 
     if (!view) {
       toast.error("That view is gone.")
-      setParameters({}, { replace: true })
+
+      /* ⚠️ **Only `view` is removed, and it used to be the whole address.** `setParameters({})` was
+         harmless while nothing else lived there; now the type, the search and the page do, and clearing
+         all of them would answer a missing view by throwing away everything the reader had narrowed to. */
+      setParameters(
+        (current) => {
+          const next = new URLSearchParams(current)
+          next.delete("view")
+
+          return next
+        },
+        { replace: true },
+      )
 
       return
     }

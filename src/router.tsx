@@ -37,6 +37,8 @@ import { PrettyUrlPage } from "@/pages/public/PrettyUrlPage"
 import { PublicEntryPage } from "@/pages/public/PublicEntryPage"
 import { PublicFormPage } from "@/pages/public/PublicFormPage"
 import { PublicPageView } from "@/pages/public/PublicPageView"
+import { PublicViewerPage } from "@/pages/public/PublicViewerPage"
+import { PublicAccessError } from "@/components/public/PublicSurface"
 import { EmailVerifyPage } from "@/pages/auth/EmailVerifyPage"
 import { MagicLinkPage } from "@/pages/auth/MagicLinkPage"
 import { MagicLinkVerifyPage } from "@/pages/auth/MagicLinkVerifyPage"
@@ -90,9 +92,13 @@ export function ApplicationRoutes() {
           and outside `NavigationContextGate`: a visitor has no token and no workspace, and a gate that
           asked for either would send somebody holding a perfectly good link to a sign-in page.
 
-          ⚠️ `/_/category/*` and `/_/viewer/*` are deliberately absent. Publishing a FOLDER is something
-          this product no longer does — the public manual is Kiwi's, embedded — and the file endpoints
-          are mid-migration, so their public screens are unported rather than half-ported. */}
+          ⚠️ `/_/category/*` is deliberately absent, and stays that way: publishing a FOLDER is something
+          this product no longer does — the public manual is Kiwi's, embedded.
+
+          ⚠️ `/_/viewer/*` used to be absent for a different reason — "the file endpoints are
+          mid-migration" — and that reason expired without the comment noticing. The backend has pointed
+          every shared file at `/_/viewer` since sharing was built and `fileLinks.viewer()` has been
+          minting the address all along, so the missing route was not a deferral, it was a dead link. */}
       {/* The manual: public, anonymous, read out of Kiwi through this backend as a granted consumer, and
           addressed by the permanent address so a link keeps working. ⚠️ It stays that way permanently —
           those addresses live in Kiwi and are not moving here. */}
@@ -104,6 +110,18 @@ export function ApplicationRoutes() {
       {/* A page published out of THIS product's store — a different thing from a manual page, and the
           address `publicPageUrl` mints. */}
       <Route path="/_/page/:shareToken" element={<PublicPageView />} />
+
+      {/* ⚠️ The address the backend has been minting since sharing was built — `FileResourceDescriptor`
+          points every shared file at `/_/viewer`, and `fileLinks.viewer()` writes it — while this
+          interface had no route for it, so the link fell through to the application's own not-found. */}
+      <Route path="/_/viewer/:shareToken" element={<PublicViewerPage />} />
+
+      {/* ⚠️ **The floor under every public address, and it must stay last in this block.** A `/_/` link
+          that resolves to nothing is somebody holding a dead or mistyped link, and the one thing they
+          must not get is the signed-in application's not-found screen — which offers a way into a
+          product they have no account for and says, by existing, that they are somewhere they are not.
+          Every public page renders this same notice for a revoked link, so all four read alike. */}
+      <Route path="/_/*" element={<PublicAccessError />} />
 
       <Route
         element={

@@ -1,7 +1,7 @@
 import { useRef, useState } from "react"
 import { Link } from "react-router-dom"
 import { toast } from "sonner"
-import { ExternalLink, Search } from "lucide-react"
+import { ExternalLink, Pencil, Search } from "lucide-react"
 import {
   Badge,
   Button,
@@ -40,6 +40,12 @@ import type { FormEntry } from "@/types"
  * preserve, it is entirely what somebody came for, and a narrow strip is a poor room for a form of forty
  * fields. Same body, same footer, same write path; a different container for a different act.
  *
+ * ⚠️ **The container is now the CALLER's choice, not a consequence of whether the row exists.** A list
+ * whose rows open their own page has no drawer left to want: its rows carry an Edit control instead, and
+ * what that opens is a form somebody came to fill in — the modal case, over a row that already exists.
+ * `container` names it outright rather than making callers infer it from `isNew`, which is a different
+ * question that happens to have had the same answer.
+ *
  * ⚠️ **Reading and editing are two states of one surface, not two components.** The values are the same
  * values and the schema is the same schema — two implementations is how a field renders one way in the
  * list and another way in the editor, and nobody can say which is the record.
@@ -57,11 +63,29 @@ export function EntryDetailDrawer({
   isNew = false,
   isSubmitting = false,
   permalink,
+  container,
+  startInEdit,
   onSubmit,
   onDelete,
   onClose,
 }: {
   formId: string
+  /**
+   * Centred over the screen, or a panel at the edge.
+   *
+   * ⚠️ **Left unset it keeps the old rule** — a modal for a row being added, a drawer for one being
+   * read — so no existing caller changes behaviour. Name it when the surface underneath is not a list
+   * somebody is working down, because that is the only thing a drawer is better at.
+   */
+  container?: "dialog" | "sheet"
+  /**
+   * Open straight into the editor rather than into the record.
+   *
+   * ⚠️ **Only ever set by a control that SAYS it edits.** An existing row opening in edit is how
+   * somebody changes a value they meant to look at — which is why this is off unless a caller asks, and
+   * why the caller that asks is an Edit button rather than a row click.
+   */
+  startInEdit?: boolean
   /**
    * The row's own address, when it has one.
    *
@@ -107,9 +131,13 @@ export function EntryDetailDrawer({
    */
   const schemaFailure = describeQueryFailure(schemaQuery, "form")
 
-  // ⚠️ A new row opens in edit; an existing one opens in read. Opening an existing row in edit is how
-  // somebody changes a value they only meant to look at.
-  const [editing, setEditing] = useState(isNew)
+  // ⚠️ A new row opens in edit; an existing one opens in read, unless the control that opened it was
+  // itself an Edit. Opening an existing row in edit *by default* is how somebody changes a value they
+  // only meant to look at.
+  const [editing, setEditing] = useState(startInEdit ?? isNew)
+
+  // ⚠️ The old rule is the fallback, so a caller that names nothing behaves exactly as it always did.
+  const asDialog = container ? container === "dialog" : isNew
   const [confirmingRemoval, setConfirmingRemoval] = useState(false)
   const [isLookingUp, setLookingUp] = useState(false)
   const formRef = useRef<HTMLFormElement | null>(null)
@@ -143,19 +171,14 @@ export function EntryDetailDrawer({
     }
   }
 
+  /* ⚠️ **The way to the full page is a BUTTON in the footer, not a link in the header.** It used to be
+     a small grey line beside the title, which reads as a caption rather than as somewhere to go — and
+     it sat next to the ✕, where a miss closes the record instead of opening it. In the footer it is
+     the same size and the same shape as Edit, which is the other thing somebody does from here. */
   const heading = (
     <>
       {form?.name ?? formName ?? "Entry"}
       {isNew && <Badge variant="secondary">new</Badge>}
-      {permalink && !isNew && (
-        <Link
-          to={permalink}
-          className="ml-auto flex shrink-0 items-center gap-1 text-[11px] font-normal text-muted-foreground hover:text-foreground"
-        >
-          Open on its own page
-          <ExternalLink className="size-3" />
-        </Link>
-      )}
     </>
   )
 
@@ -264,7 +287,17 @@ export function EntryDetailDrawer({
                 </Button>
               )}
 
+              {permalink && entry && (
+                <Button asChild variant="outline" size="sm">
+                  <Link to={permalink}>
+                    <ExternalLink className="size-3.5" />
+                    Open in full page
+                  </Link>
+                </Button>
+              )}
+
               <Button size="sm" disabled={!form} onClick={() => setEditing(true)}>
+                <Pencil className="size-3.5" />
                 Edit
               </Button>
             </>
@@ -286,7 +319,23 @@ export function EntryDetailDrawer({
     container the act calls for; two implementations of "fill this in" is how a field comes to render
     one way here and another way there.
   */
-  if (isNew) {
+  /* ⚠️ Rendered beside whichever container is chosen, never inside only one of them. It used to hang off
+     the sheet alone, which was invisible while `isNew` was the only way to get a dialog — the moment an
+     existing row could open in one, pressing Look up there would have done nothing at all. */
+  const lookupDialog = isLookingUp && entry && form && (
+    <EntryLookupDialog
+      entry={entry}
+      form={form}
+      isSaving={isSubmitting}
+      onApply={async (values) => {
+        await submit(values)
+        setLookingUp(false)
+      }}
+      onClose={() => setLookingUp(false)}
+    />
+  )
+
+  if (asDialog) {
     return (
       <Dialog open onOpenChange={(next) => !next && onClose()}>
         <DialogContent
@@ -305,6 +354,8 @@ export function EntryDetailDrawer({
 
           {body}
         </DialogContent>
+
+        {lookupDialog}
       </Dialog>
     )
   }
@@ -325,18 +376,7 @@ export function EntryDetailDrawer({
 
       {/* ⚠️ Applying writes through the same `onSubmit` the form uses — one write path, so a value taken
           from a distributor is validated exactly as a typed one is. */}
-      {isLookingUp && entry && form && (
-        <EntryLookupDialog
-          entry={entry}
-          form={form}
-          isSaving={isSubmitting}
-          onApply={async (values) => {
-            await submit(values)
-            setLookingUp(false)
-          }}
-          onClose={() => setLookingUp(false)}
-        />
-      )}
+      {lookupDialog}
     </Sheet>
   )
 }

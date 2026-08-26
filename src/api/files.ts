@@ -46,6 +46,8 @@ export const fileLinks = {
   view: (viewToken: string) => `/_/file/${viewToken}`,
   absoluteView: (viewToken: string) => `${window.location.origin}/_/file/${viewToken}`,
   viewer: (viewToken: string) => `/_/viewer/${viewToken}`,
+  /** ⚠️ The address somebody is GIVEN — the branded page, absolute so it survives being pasted. */
+  absoluteViewer: (viewToken: string) => `${window.location.origin}/_/viewer/${viewToken}`,
 }
 
 /**

@@ -2,7 +2,7 @@ import { useState } from "react"
 import { useParams } from "react-router-dom"
 import { Button, Skeleton } from "@jmouse/ui"
 import { DynamicForm } from "@/components/form/DynamicForm"
-import { PoweredBy, PublicNotice, PublicSurface } from "@/components/public/PublicSurface"
+import { PoweredBy, PublicNotice, PublicSurface, UNAVAILABLE_BLURB } from "@/components/public/PublicSurface"
 import { useSubmitPublicEntry, usePublicForm } from "@/hooks/usePublic"
 import { readFormConfigs } from "@/lib/formConfigs"
 import { isFieldValidationError } from "@/lib/formValues"
@@ -81,7 +81,7 @@ export function PublicFormPage({ shareToken: given }: { shareToken?: string } = 
 
       {isError && (
         <PublicNotice icon="🔗" title="This form is not available">
-          The link may have been revoked, or this form may have stopped accepting responses.
+          {UNAVAILABLE_BLURB}
         </PublicNotice>
       )}
 

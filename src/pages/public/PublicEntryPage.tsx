@@ -1,7 +1,7 @@
 import { useParams } from "react-router-dom"
 import { Button, Skeleton } from "@jmouse/ui"
 import { EntryRecord } from "@/components/form/EntryRecord"
-import { PoweredBy, PublicNotice, PublicSurface } from "@/components/public/PublicSurface"
+import { PoweredBy, PublicAccessError, PublicSurface } from "@/components/public/PublicSurface"
 import { usePublicEntry, usePublicEntryForm } from "@/hooks/usePublic"
 
 /**
@@ -32,11 +32,7 @@ export function PublicEntryPage({ shareToken: given }: { shareToken?: string } =
 
   if (isError || !entry || !form) {
     return (
-      <PublicSurface>
-        <PublicNotice icon="🔗" title="This record is not available">
-          The link may have been revoked, or sharing may have been switched off for it.
-        </PublicNotice>
-      </PublicSurface>
+      <PublicAccessError what="record" />
     )
   }
 

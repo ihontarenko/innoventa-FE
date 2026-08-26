@@ -11,10 +11,20 @@ import { InnoventaMark } from "@/components/icons/InnoventaMark"
  */
 export function PublicSurface({
   accentColour,
+  wide = false,
   children,
 }: {
   /** A form's own colour, if it set one. ⚠️ Overrides `--primary` for this subtree only. */
   accentColour?: string | null
+  /**
+   * Room for a document rather than for prose.
+   *
+   * ⚠️ **A measure is a reading decision, and the two readings differ.** A form or a record is read down
+   * a column, and 2xl is about as wide as a line may run before the eye loses it. A 118-page PDF is not
+   * read that way at all — it is scanned, and squeezing it into a column of prose makes every page
+   * unreadable to save a rule that was never about documents.
+   */
+  wide?: boolean
   children: ReactNode
 }) {
   const accented = accentColour
@@ -31,7 +41,7 @@ export function PublicSurface({
       </header>
 
       <main className="flex flex-1 flex-col items-center px-4 py-8 sm:py-12">
-        <div className="w-full max-w-2xl">{children}</div>
+        <div className={wide ? "w-full max-w-6xl" : "w-full max-w-2xl"}>{children}</div>
       </main>
     </div>
   )
@@ -73,5 +83,38 @@ export function PoweredBy() {
         Innoventa
       </a>
     </p>
+  )
+}
+
+/**
+ * The one thing every dead public link says.
+ *
+ * ⚠️ **One component, not four sentences that drifted apart.** A revoked form, a deleted record, a file
+ * whose sharing was switched off and an address nobody ever minted are four different facts to the
+ * server and exactly one fact to the visitor: *this link does not resolve*. Four screens wording that
+ * four ways is how one of them ends up leaking which of the four it was.
+ *
+ * ⚠️ **It never says why.** "Revoked", "expired" and "never existed" are three different statements
+ * about somebody else's data, and telling them apart to an anonymous visitor confirms a resource exists
+ * to somebody who was not given the link.
+ */
+/**
+ * The one sentence every dead public link carries.
+ *
+ * ⚠️ **Exported so the four surfaces cannot drift.** They said four different things — one of them,
+ * "it may never have been public", told an anonymous visitor which of the causes it was.
+ */
+export const UNAVAILABLE_BLURB =
+  "It may have been revoked, or sharing may have been switched off for it. If somebody sent you this address, ask them for a new one."
+
+export function PublicAccessError({ what = "link" }: { what?: string }) {
+  return (
+    <PublicSurface>
+      <PublicNotice icon="🔗" title={`This ${what} is not available`}>
+        {UNAVAILABLE_BLURB}
+      </PublicNotice>
+
+      <PoweredBy />
+    </PublicSurface>
   )
 }

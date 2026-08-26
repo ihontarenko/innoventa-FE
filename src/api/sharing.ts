@@ -1,11 +1,10 @@
 import { http } from "./http"
 
 export type ShareLinkKind = 'SHARE' | 'OG' | 'CUSTOM';
-export type SharedResourceType = 'CATEGORY' | 'PAGE' | 'FORM' | 'ENTRY' | 'FILE';
+export type SharedResourceType = 'PAGE' | 'FORM' | 'ENTRY' | 'FILE';
 
 /** The in-app public route each resource type's SHARE token renders at. */
 const PUBLIC_ROUTE: Record<SharedResourceType, string> = {
-    CATEGORY: '/_/category',
     PAGE:     '/_/page',
     FORM:     '/_/form',
     ENTRY:    '/_/entry',

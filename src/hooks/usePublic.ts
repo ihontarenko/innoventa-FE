@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query"
-import { publicEntryApi, publicFormsApi } from "@/api/public"
+import { publicEntryApi, publicFileApi, publicFormsApi, type PublicFileMeta } from "@/api/public"
 import type { FormDetail, FormEntry } from "@/types"
 
 /**
@@ -38,6 +38,16 @@ export function usePublicEntryForm(shareToken: string | undefined) {
     queryKey: ["public-entry-form", shareToken],
     queryFn: () => publicEntryApi.getForm(shareToken!).then((response) => response.data),
     enabled: !!shareToken,
+    staleTime: 5 * 60_000,
+    retry: 1,
+  })
+}
+
+export function usePublicFile(viewToken: string | undefined) {
+  return useQuery<PublicFileMeta>({
+    queryKey: ["public-file", viewToken],
+    queryFn: () => publicFileApi.meta(viewToken!).then((response) => response.data),
+    enabled: !!viewToken,
     staleTime: 5 * 60_000,
     retry: 1,
   })

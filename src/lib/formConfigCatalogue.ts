@@ -142,6 +142,7 @@ export const FORM_CONFIG_GROUPS: ConfigGroup[] = [
     entries: [
       { key: "stock.quantity_field", label: "Quantity", control: { kind: "field", accepts: ["NUMBER", "SIMPLE_COMPOSITE"] } },
       { key: "stock.threshold_field", label: "Low-stock threshold", control: { kind: "field", accepts: ["NUMBER"] } },
+      { key: "stock.location_field", label: "Where it is kept", control: { kind: "field", accepts: ["SELECT", "TEXT"] } },
     ],
   },
   {

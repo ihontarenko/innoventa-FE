@@ -38,11 +38,17 @@ import {
 import { embedSnippet, shareLinkUrl, sharingApi } from "@/api/sharing"
 import type { ShareLinkKind, SharedResourceRow, SharedResourceType, SharingDashboard } from "@/api/sharing"
 
-const TYPES: SharedResourceType[] = ["CATEGORY", "PAGE", "FORM", "ENTRY", "FILE"]
+const TYPES: SharedResourceType[] = ["PAGE", "FORM", "ENTRY", "FILE"]
 const LINK_KINDS: ShareLinkKind[] = ["SHARE", "OG", "CUSTOM"]
 
-/** Resource types whose share exposes an embeddable widget (the "Embed" tab in Manage). */
-const EMBEDDABLE_TYPES: SharedResourceType[] = ["CATEGORY"]
+/**
+ * Resource types whose share exposes an embeddable widget (the "Embed" tab in Manage).
+ *
+ * ⚠️ **It read `["CATEGORY"]`, a type that no longer exists** — so the Embed tab was offered for nothing
+ * at all and the feature looked unbuilt. A form is the one public surface this product still embeds:
+ * `/_/form/:token/embed` is a real route with a real page behind it.
+ */
+const EMBEDDABLE_TYPES: SharedResourceType[] = ["FORM"]
 
 const KIND_LABEL: Record<ShareLinkKind, string> = {
   SHARE: "Share token",
@@ -57,7 +63,6 @@ const KIND_HINT: Record<ShareLinkKind, string> = {
 }
 
 const TYPE_ICON: Record<SharedResourceType, string> = {
-  CATEGORY: "🗂",
   PAGE: "📄",
   FORM: "📝",
   ENTRY: "🧾",
@@ -538,7 +543,7 @@ function ShareNewDialog({
 }) {
   const mintShare = useMintShare()
 
-  const [type, setType] = useState<SharedResourceType>("CATEGORY")
+  const [type, setType] = useState<SharedResourceType>("PAGE")
   const [resourceId, setResourceId] = useState("")
 
   const typeConfig = config.types.find((entry) => entry.resourceType === type)

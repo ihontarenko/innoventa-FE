@@ -1,16 +1,63 @@
 import { useRef, useState } from "react"
-import { useNavigate, useParams } from "react-router-dom"
+import { Link, useNavigate, useParams } from "react-router-dom"
 import { toast } from "sonner"
 import { Search } from "lucide-react"
 import { Button, Skeleton } from "@jmouse/ui"
 import { PageHeader } from "@/components/PageHeader"
 import { DynamicForm } from "@/components/form/DynamicForm"
-import { EntryRecord } from "@/components/form/EntryRecord"
+import { EntryDossier } from "@/components/entry/EntryDossier"
+import { ShareControl } from "@/components/sharing/ShareControl"
 import { EntryLookupDialog } from "@/components/lookup/EntryLookupDialog"
 import { useForm } from "@/hooks/useForms"
 import { useDeleteEntry, useEntry, useUpdateEntry } from "@/hooks/useWorkspaceForms"
 import { LabelPrintButton } from "@/components/labels/LabelPrintButton"
 import { readableMoment } from "@/lib/dates"
+import { spaceSectionPath } from "@/lib/navigationContext"
+import { useSpaceStore } from "@/stores/spaceStore"
+import type { FormDetail } from "@/types"
+
+/**
+ * Where this record sits, as two links rather than as a title.
+ *
+ * ⚠️ **Back was blamed for this and Back was never the problem.** The list kept its chosen type, its
+ * search and its page in component state, so returning to it landed on *All types* whatever somebody had
+ * been looking at. That is fixed in `InventoryPage` by moving those into the address — and this exists
+ * because a trail is the half that does not depend on history at all: somebody who arrived from a pasted
+ * link, a search hit or a parametric match has nothing to go *back* to, and still needs a way up.
+ *
+ * ⚠️ **The second crumb carries the type**, so it lands on the list already narrowed rather than on
+ * everything. It is the same `?type=` the list now reads.
+ *
+ * ⚠️ **Which list is decided by the record's PURPOSE, not by where the reader came from.** A catalogue
+ * part reached from a search belongs under Catalogs however it was found; sending somebody "back" to a
+ * screen their record does not live on is worse than sending them nowhere.
+ */
+function EntryTrail({ form, spaceSlug }: { form: FormDetail; spaceSlug: string | null }) {
+  const section = form.purpose?.code === "INVENTORY" ? "inventory" : "catalog"
+  const listPath = spaceSlug ? spaceSectionPath(spaceSlug, section) : null
+  const listLabel = section === "inventory" ? "Inventory" : "Catalogs"
+
+  if (!listPath) {
+    return <span className="font-display text-lg font-semibold tracking-[-0.02em]">{form.name}</span>
+  }
+
+  return (
+    <span className="flex min-w-0 flex-wrap items-baseline gap-1.5">
+      <Link to={listPath} className="text-sm text-muted-foreground hover:text-foreground hover:underline">
+        {listLabel}
+      </Link>
+      <span aria-hidden="true" className="text-muted-foreground/50">
+        /
+      </span>
+      <Link
+        to={`${listPath}?type=${encodeURIComponent(form.id)}`}
+        className="truncate font-display text-lg font-semibold tracking-[-0.02em] hover:underline"
+      >
+        {form.name}
+      </Link>
+    </span>
+  )
+}
 
 /**
  * One row, on a page of its own.
@@ -27,6 +74,7 @@ import { readableMoment } from "@/lib/dates"
 export function EntryPage() {
   const { formId, entryId } = useParams<{ formId: string; entryId: string }>()
   const navigate = useNavigate()
+  const spaceSlug = useSpaceStore((state) => state.activeSpaceSlug)
 
   const { data: form, isLoading: formLoading } = useForm(formId)
   const { data: entry, isLoading: entryLoading } = useEntry(formId, entryId)
@@ -74,7 +122,7 @@ export function EntryPage() {
   return (
     <>
       <PageHeader
-        title={form.name}
+        title={<EntryTrail form={form} spaceSlug={spaceSlug} />}
         description={`Recorded ${readableMoment(entry.createdAt)}${
           entry.updatedAt !== entry.createdAt ? ` · changed ${readableMoment(entry.updatedAt)}` : ""
         }`}
@@ -146,6 +194,11 @@ export function EntryPage() {
                 </Button>
               )}
 
+              {/* ⚠️ The record's own public address, minted from the record. Until this existed a row
+                  could be *shown* as shared — `EntryIdentityCard` draws the badge — and never made so,
+                  which is why the Sharing Centre counted zero shared entries. */}
+              <ShareControl entityType="ENTRY" entityId={entry.id} subject="this record" />
+
               <Button size="sm" onClick={() => setEditing(true)}>
                 Edit
               </Button>
@@ -154,7 +207,12 @@ export function EntryPage() {
         }
       />
 
-      <div className="max-w-5xl">
+      {/* ⚠️ **Wide while reading, narrow while editing, and the difference is not cosmetic.** A record
+          is read across — specifications beside stock beside what it is attached to — and the old
+          `max-w-5xl` left two thirds of a desktop window empty. A form is filled in down a single
+          column, and a row of inputs stretched across 2000px is a row nobody can follow from label to
+          control. */}
+      <div className={editing ? "max-w-3xl" : "min-w-0"}>
         {editing ? (
           <DynamicForm
             form={form}
@@ -169,7 +227,7 @@ export function EntryPage() {
             }}
           />
         ) : (
-          <EntryRecord form={form} entry={entry} />
+          <EntryDossier form={form} entry={entry} onLookUp={canLookUp ? () => setLookingUp(true) : undefined} />
         )}
       </div>
 

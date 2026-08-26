@@ -54,3 +54,27 @@ export const publicEntryApi = {
    */
   getForm: (shareToken: string) => http.get<FormDetail>(`/public/entries/${shareToken}/form`),
 }
+
+/**
+ * What a shared file is, before any of its bytes are asked for.
+ *
+ * ⚠️ **The share token IS the credential**, and it is the same token `/_/file/{token}` serves the bytes
+ * behind — so a viewer page needs no session and no second kind of link.
+ */
+export interface PublicFileMeta {
+  fileName: string
+  mimeType: string
+  fileSize: number
+  /** Where the bytes are — `/_/file/{token}`, served by the backend, never by the SPA. */
+  contentUrl: string
+}
+
+export const publicFileApi = {
+  /**
+   * ⚠️ **Metadata is a separate call from the bytes, deliberately.** A viewer has to know what it is
+   * about to show *before* showing it — a PDF is framed, a picture is drawn, anything else is offered
+   * as a download — and guessing from the file extension is how a `.bin` named `report.pdf` gets an
+   * empty frame instead of an honest download button.
+   */
+  meta: (viewToken: string) => http.get<PublicFileMeta>(`/public/files/${viewToken}/meta`),
+}
