@@ -5,6 +5,7 @@ import { FieldValue } from "@/components/form/FieldValue"
 import { EntryGap, EntryLine, EntryPanel } from "@/components/entry/EntryPanel"
 import type { StockCapability, SupplyCapability } from "@/components/entry/entryCapabilities"
 import { TOMBSTONE_LABEL } from "@/api/optionSources"
+import { optionsWithLabels } from "@/lib/entryLabels"
 import { spaceSectionPath } from "@/lib/navigationContext"
 import { useSpaceStore } from "@/stores/spaceStore"
 import { hostOf } from "@/lib/webAddress"
@@ -26,7 +27,7 @@ function valueOf(entry: FormEntry, field: FieldDetail | null): string {
 }
 
 /**
- * How many there are, and whether that is enough.
+ * How many there are here, and whether that is enough here.
  *
  * ⚠️ **No bar, and that is the point.** There were two real numbers here — how many there are and the
  * minimum — and no maximum anywhere: a shelf has no declared capacity. A bar drawn against
@@ -36,6 +37,9 @@ function valueOf(entry: FormEntry, field: FieldDetail | null): string {
  *
  * ⚠️ **And no judgement at all where no minimum is configured.** *In stock* against nothing to compare
  * to is the same invented reference in words.
+ *
+ * ⚠️ **The verdict is about THIS PLACE, not about the part.** The minimum lives on the position, so a
+ * drawer holding three of something reads low even when the next drawer along holds two hundred.
  */
 export function EntryStockPanel({ entry, stock }: { entry: FormEntry; stock: StockCapability }) {
   const quantity = numberOf(entry, stock.quantity)
@@ -185,7 +189,10 @@ export function EntrySupplyPanel({
             value={entry.fieldValues[field.name] ?? ""}
             elementType={field.elementType}
             unit={field.unit}
-            options={field.options}
+            // ⚠️ `optionsWithLabels`, not the field's own `options`. A source-backed field carries no
+            // static options at all, so passing them through prints the stored identifier — the same
+            // defect fixed elsewhere, surviving here because this panel was written apart.
+            options={optionsWithLabels(field, entry)}
           />
         </EntryLine>
       ))}

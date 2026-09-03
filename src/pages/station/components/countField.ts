@@ -1,3 +1,4 @@
+import { FORM_CONFIG_KEYS } from "@/lib/formConfigs"
 import type { FieldDetail } from "@/types/forms"
 
 /**
@@ -33,10 +34,25 @@ import type { FieldDetail } from "@/types/forms"
  * saves without error and reads back empty.
  */
 
-/** The `config` keys a form uses to say what its fields mean. The first is this station's addition. */
-export const QUANTITY_FIELD_CONFIG_KEY = "quantityField"
-export const IMAGE_FIELD_CONFIG_KEY = "imageField"
-export const PRIMARY_FIELD_CONFIG_KEY = "primaryField"
+/**
+ * The `config` keys a form uses to say what its fields mean — **the installation's own vocabulary**.
+ *
+ * <h2>⚠️ These were invented here, matched nothing, and failed as something plausible</h2>
+ *
+ * <p>They read `"primaryField"`, `"imageField"` and `"quantityField"`. What a form actually stores is
+ * `display.primary_field`, `display.image_field` and `stock.quantity_field` — so every lookup missed,
+ * every getter fell through to its fallback, and the station titled each row with *the form's first
+ * field*. On the inventory form that is the component type, so a drawer of forty different parts
+ * listed as `Resistor · Resistor · Resistor`. Nothing errored: a fallback firing looks exactly like a
+ * form that declared nothing.
+ *
+ * <p>⚠️ **So they are re-exported from `FORM_CONFIG_KEYS` rather than restated.** A key named in two
+ * places is a key that drifts, and this is what the drift looks like — not a crash, a screen quietly
+ * answering a different question.
+ */
+export const QUANTITY_FIELD_CONFIG_KEY = FORM_CONFIG_KEYS.STOCK_QUANTITY_FIELD
+export const IMAGE_FIELD_CONFIG_KEY = FORM_CONFIG_KEYS.IMAGE_FIELD
+export const PRIMARY_FIELD_CONFIG_KEY = FORM_CONFIG_KEYS.PRIMARY_FIELD
 
 /** Where a person's choice is remembered. Per form, because that is what the question is about. */
 const CHOICE_STORAGE_PREFIX = "innoventa.station.components.count-field."

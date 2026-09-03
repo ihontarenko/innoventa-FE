@@ -2,6 +2,7 @@ import { useState } from "react"
 import { toast } from "sonner"
 import { Badge, Button, Input, Skeleton, cn } from "@jmouse/ui"
 import { PageHeader } from "@/components/PageHeader"
+import { SearchModes } from "@/components/search/SearchModes"
 import { ToggleChip } from "@/components/ToggleChip"
 import { PlainSelect } from "@/components/access/PolicyEditingKit"
 import { EntryDetailDrawer } from "@/components/form/EntryDetailDrawer"
@@ -109,6 +110,8 @@ export function ParametricSearchPage() {
         title="Parametric search"
         description="Find what you own by value — 100 nF and 0.1 µF match the same part, because values are normalised to a base unit when they are saved"
       />
+
+      <SearchModes />
 
       <div className="flex min-w-0 flex-col gap-4">
         <div className="flex flex-wrap items-end gap-2 rounded-md border p-3">

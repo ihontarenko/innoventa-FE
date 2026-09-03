@@ -7,8 +7,7 @@ import { useAuthStore } from "@/stores/authStore"
 import { navigationScreen, screenItems } from "@/navigation"
 
 /**
- * A screen that is itself a menu — Administration, the Workbench: its rail, and whichever of its
- * destinations is open.
+ * A screen that is itself a menu — Administration: its rail, and whichever of its destinations is open.
  *
  * ⚠️ **The navigation is on the SCREEN, and the sidebar never changes.** An earlier attempt swapped the
  * platform menu out while the reader was inside Administration, the way entering a workspace does. It
@@ -17,9 +16,7 @@ import { navigationScreen, screenItems } from "@/navigation"
  *
  * ⚠️ **The rail is a list of LINKS, and it imposes no address prefix.** `Purposes` is on it and lives
  * at `/purposes`, because purposes are installation-wide and that address is deliberately kept out of
- * `LEGACY_SPACE_SECTIONS`. Being grouped under a screen is not the same as living under its route, and
- * the Mapping builder — `/admin/mapping`, filed under the Workbench — is the same fact from the other
- * side.
+ * `LEGACY_SPACE_SECTIONS`. Being grouped under a screen is not the same as living under its route.
  *
  * ⚠️ **The header slot is the first child and the rail is not.** `PageHeader` cancels the content box's
  * padding with negative margins; inside the rail's grid cell it would cancel the wrong box. So the open

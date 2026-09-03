@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { useNavigate, useSearchParams } from "react-router-dom"
+import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 import {
   Badge,
@@ -21,6 +21,8 @@ import {
   Textarea,
 } from "@jmouse/ui"
 import { PageHeader } from "@/components/PageHeader"
+import { ToggleChip } from "@/components/ToggleChip"
+import { DependantProjectsPane } from "@/components/inventory/DependantProjectsPane"
 import { PlainSelect } from "@/components/access/PolicyEditingKit"
 import { EditorField } from "@/components/form/builder/EditorSection"
 import {
@@ -31,6 +33,7 @@ import {
   useUpdateLocation,
 } from "@/hooks/useStorageLocations"
 import { spaceSectionPath } from "@/lib/navigationContext"
+import { useAddress } from "@/hooks/useAddress"
 import { useSpaceStore } from "@/stores/spaceStore"
 import type { StorageLocation, StorageLocationKind } from "@/api/storageLocations"
 
@@ -84,7 +87,7 @@ export function LocationsPage() {
 
   const { data: tree = [], isLoading } = useStorageLocations()
 
-  const [parameters, setParameters] = useSearchParams()
+  const { parameters, amend } = useAddress()
 
   const createLocation = useCreateLocation()
   const updateLocation = useUpdateLocation()
@@ -98,15 +101,19 @@ export function LocationsPage() {
    * here it is also pasteable, which is the same reason a record has a page of its own.
    */
   const selectedId = parameters.get("location")
-  const setSelectedId = (locationId: string | null) => {
-    /* ⚠️ `replace`, so walking a tree does not fill the Back button with every node touched on the way. */
-    setParameters(locationId ? { location: locationId } : {}, { replace: true })
-  }
+  /* ⚠️ `replace`, so walking a tree does not fill the Back button with every node touched on the way. */
+  const setSelectedId = (locationId: string | null) => amend({ location: locationId })
   const [draft, setDraft] = useState<Draft | null>(null)
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [search, setSearch] = useState("")
 
-  const { data: contents = [] } = useLocationContents(selectedId ?? undefined)
+  /**
+   * ⚠️ **In the address, because "the cabinet, everything under it" is a different answer.** A person
+   * who sent somebody a link to a place meant one of the two; keeping the choice in component state
+   * would make the link mean whichever the recipient's screen happened to be set to.
+   */
+  const deep = parameters.get("deep") === "1"
+  const { data: contents = [] } = useLocationContents(selectedId ?? undefined, deep)
 
   // Flattened once, with depth, so the list can be searched and drawn without walking the tree twice.
   const flattened = useMemo(() => flatten(tree), [tree])
@@ -291,33 +298,61 @@ export function LocationsPage() {
 
         <aside className="flex min-w-0 flex-col gap-2">
           {selected ? (
-            <RowGroup
-              label={selected.path}
-              tally={`${contents.length} here`}
-            >
-              {contents.length === 0 ? (
-                <p className="rounded-md border border-dashed px-3 py-4 text-center text-xs text-muted-foreground">
-                  Nothing is filed directly in {selected.name}.
-                  {/* ⚠️ Said explicitly, because a container whose children are full reads as empty here
-                      and that looks like a fault rather than an answer. */}
-                  {selected.children.length > 0 && " What is inside it is filed in its own places."}
-                </p>
-              ) : (
-                <RowList>
-                  {contents.map((item) => (
-                    <Row
-                      key={item.entryId}
-                      onOpen={() =>
-                        spaceSlug && navigate(spaceSectionPath(spaceSlug, `entry/${item.formName}/${item.entryId}`))
-                      }
+            <>
+              <RowGroup
+                label={selected.path}
+                tally={`${contents.length} ${deep ? "in all" : "here"}`}
+              >
+                {/* ⚠️ **Offered only where there is something inside**, because on a drawer the two
+                    answers are the same one and a toggle that changes nothing reads as broken. */}
+                {selected.children.length > 0 && (
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 text-[11px]">
+                    <ToggleChip
+                      active={deep}
+                      title="Count what is filed in the places inside this one too"
+                      onClick={() => amend({ deep: deep ? null : "1" })}
                     >
-                      <RowTitle>{item.label}</RowTitle>
-                      <RowMeta>{item.formName}</RowMeta>
-                    </Row>
-                  ))}
-                </RowList>
-              )}
-            </RowGroup>
+                      Include nested
+                    </ToggleChip>
+                  </div>
+                )}
+
+                {contents.length === 0 ? (
+                  <p className="rounded-md border border-dashed px-3 py-4 text-center text-xs text-muted-foreground">
+                    Nothing is filed directly in {selected.name}.
+                    {/* ⚠️ Said explicitly, because a container whose children are full reads as empty
+                        here and that looks like a fault rather than an answer. */}
+                    {!deep && selected.children.length > 0 && " What is inside it is filed in its own places."}
+                  </p>
+                ) : (
+                  <RowList>
+                    {contents.map((item) => (
+                      <Row
+                        key={item.entryId}
+                        /* ⚠️ The form's **id**. This was built from `formName`, so every row led to
+                           `/entry/Inventory/abc` — a route that resolves to nothing. */
+                        onOpen={() =>
+                          spaceSlug && navigate(spaceSectionPath(spaceSlug, `entry/${item.formId}/${item.entryId}`))
+                        }
+                      >
+                        <RowTitle>{item.label}</RowTitle>
+                        <RowMeta>
+                          {item.formName}
+                          {/* Where exactly, and only when it is not the place already named above. */}
+                          {item.location && ` · ${item.location}`}
+                        </RowMeta>
+                      </Row>
+                    ))}
+                  </RowList>
+                )}
+              </RowGroup>
+
+              {/* ⚠️ Below the contents, because it is a consequence of them: these are the projects
+                  that would notice if any of this moved. */}
+              <RowGroup label="Projects that depend on this">
+                <DependantProjectsPane locationId={selected.id} />
+              </RowGroup>
+            </>
           ) : (
             <p className="rounded-md border border-dashed px-3 py-4 text-center text-xs text-muted-foreground">
               Pick a place to see what is filed in it.

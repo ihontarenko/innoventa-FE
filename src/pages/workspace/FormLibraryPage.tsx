@@ -9,14 +9,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   type FilterItem,
-  FilterPanel,
-  Input,
-  Skeleton,
 } from "@jmouse/ui"
 import { MoreHorizontal } from "lucide-react"
 import { CardGroup, PageCard } from "@/components/PageCard"
 import { LevelDoors } from "@/components/LevelDoor"
-import { PageHeader } from "@/components/PageHeader"
+import { ListScreen } from "@/components/layout/ListScreen"
 import { CardDensityToggle } from "@/components/CardDensityToggle"
 import { SegmentedControl } from "@/components/SegmentedControl"
 import { CreateFormDialog } from "@/components/form/CreateFormDialog"
@@ -210,10 +207,11 @@ export function FormLibraryPage() {
 
   return (
     <>
-      <PageHeader
+      <ListScreen
         title="Form library"
         description={`${scoped.length} form${scoped.length === 1 ? "" : "s"} — a schema, and what it is for`}
-        actions={
+        search={{ value: search, onChange: setSearch, placeholder: "Search forms…" }}
+        extraActions={
           <>
             {/* ⚠️ **A segment control, and at the header's own size** (Ivan, 2026-08-21). It was two
                 chips: a pair of 11-pixel pills beside a 32-pixel search box and a 32-pixel button, which
@@ -229,93 +227,72 @@ export function FormLibraryPage() {
                 { value: "everywhere", label: "Everywhere" },
               ]}
             />
-
-            <Input
-              size="sm"
-              className="w-56"
-              value={search}
-              placeholder="Search forms…"
-              onChange={(event) => setSearch(event.target.value)}
-            />
             <CardDensityToggle />
-            <Button size="sm" onClick={() => setCreating(true)}>
-              New form
-            </Button>
           </>
         }
-      />
+        action={{ label: "New form", onClick: () => setCreating(true) }}
+        rail={{
+          title: "Filter by",
+          items: filterItems,
+          activeKey: activeKey,
+          onSelect: setActiveKey,
+          allLabel: effectiveScope === "workspace" ? "This workspace" : "Everywhere",
+          allIcon: "☰",
+          allCount: scoped.length,
+        }}
+        loading={isLoading}
+        loadingRows={6}
+        isEmpty={visible.length === 0}
+        empty={{
+          title: scoped.length === 0 ? "No forms here" : "Nothing matches",
+          text:
+            scoped.length === 0 && effectiveScope === "workspace"
+              ? "Nothing is attached to this workspace yet. Create one here, or look everywhere to see what you could attach."
+              : "A form is a schema — a set of fields, and a purpose that says what answering it means.",
+          actions:
+            scoped.length === 0 ? [{ label: "New form", primary: true, onClick: () => setCreating(true) }] : [],
+        }}
+      >
+        <div className="flex flex-col gap-5 p-4">
+          {groups.map((group) => (
+            <CardGroup
+              key={group.key}
+              title={group.title}
+              icon={group.icon}
+              count={group.forms.length}
+              hue={hueOfGroup.get(group.key)}
+            >
+              {group.forms.map((form) => (
+                <FormCard
+                  key={form.id}
+                  form={form}
+                  onSchema={() => navigate(spaceSectionPath(spaceSlug ?? "", `forms/${form.id}`))}
+                  onOpenForm={() => setFilledFormId(form.id)}
+                  onPreview={() => setPreviewFormId(form.id)}
+                  onSubmissions={() =>
+                    navigate(`${spaceSectionPath(spaceSlug ?? "", "results")}?form=${form.id}`)
+                  }
+                  onManage={() => setManagedFormId(form.id)}
+                  spaceSlug={spaceSlug}
+                  doors={form.purpose ? (presentations[form.purpose.code] ?? []) : []}
+                  submissions={submissionCounts[form.id]}
+                  onDelete={() =>
+                    deleteForm.mutate(form.id, {
+                      onSuccess: () => toast.success(`${form.name} deleted.`),
+                      onError: (error) => {
+                        const detail = (error as { response?: { data?: { detail?: string } } }).response?.data
+                          ?.detail
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[15rem_minmax(0,1fr)]">
-        <FilterPanel
-          title="Filter by"
-          items={filterItems}
-          activeKey={activeKey}
-          onSelect={setActiveKey}
-          allLabel={effectiveScope === "workspace" ? "This workspace" : "Everywhere"}
-          allIcon="☰"
-          allCount={scoped.length}
-        />
-
-        <div className="flex min-w-0 flex-col gap-5">
-          {isLoading ? (
-            <Skeleton className="h-64 w-full" />
-          ) : visible.length === 0 ? (
-            <div className="flex flex-col items-center gap-1.5 rounded-md border border-dashed px-6 py-10 text-center">
-              <span aria-hidden="true" className="text-2xl">
-                📋
-              </span>
-              <span className="text-sm font-medium">{scoped.length === 0 ? "No forms here" : "Nothing matches"}</span>
-              <span className="max-w-md text-xs text-muted-foreground">
-                {scoped.length === 0 && effectiveScope === "workspace"
-                  ? "Nothing is attached to this workspace yet. Create one here, or look everywhere to see what you could attach."
-                  : "A form is a schema — a set of fields, and a purpose that says what answering it means."}
-              </span>
-              {scoped.length === 0 && (
-                <Button size="sm" className="mt-2" onClick={() => setCreating(true)}>
-                  New form
-                </Button>
-              )}
-            </div>
-          ) : (
-            groups.map((group) => (
-              <CardGroup
-                key={group.key}
-                title={group.title}
-                icon={group.icon}
-                count={group.forms.length}
-                hue={hueOfGroup.get(group.key)}
-              >
-                {group.forms.map((form) => (
-                  <FormCard
-                    key={form.id}
-                    form={form}
-                    onSchema={() => navigate(spaceSectionPath(spaceSlug ?? "", `forms/${form.id}`))}
-                    onOpenForm={() => setFilledFormId(form.id)}
-                    onPreview={() => setPreviewFormId(form.id)}
-                    onSubmissions={() =>
-                      navigate(`${spaceSectionPath(spaceSlug ?? "", "results")}?form=${form.id}`)
-                    }
-                    onManage={() => setManagedFormId(form.id)}
-                    spaceSlug={spaceSlug}
-                    doors={form.purpose ? (presentations[form.purpose.code] ?? []) : []}
-                    submissions={submissionCounts[form.id]}
-                    onDelete={() =>
-                      deleteForm.mutate(form.id, {
-                        onSuccess: () => toast.success(`${form.name} deleted.`),
-                        onError: (error) => {
-                          const detail = (error as { response?: { data?: { detail?: string } } }).response?.data?.detail
-
-                          toast.error(detail ?? "Could not delete this form.")
-                        },
-                      })
-                    }
-                  />
-                ))}
-              </CardGroup>
-            ))
-          )}
+                        toast.error(detail ?? "Could not delete this form.")
+                      },
+                    })
+                  }
+                />
+              ))}
+            </CardGroup>
+          ))}
         </div>
-      </div>
+      </ListScreen>
 
       {creating && <CreateFormDialog onClose={() => setCreating(false)} />}
 

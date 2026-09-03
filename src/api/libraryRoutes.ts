@@ -30,8 +30,8 @@ export const LIBRARY_ROUTES = {
   ai: `${JMOUSE_ROOT}/ai/api`,
   /** `jmouse-query-spring-boot` — the filter builder, saved views and source declarations. */
   query: `${JMOUSE_ROOT}/query/api`,
-  /** `jmouse-mapper-management` — the `.jmm` builder: the type catalogue, and rows ⇄ document. */
-  mapper: `${JMOUSE_ROOT}/mapper/api`,
+  /** `jmouse-validation-management` — the `.jmv` builder: the check catalogue, and rows ⇄ document. */
+  validation: `${JMOUSE_ROOT}/validation/api`,
   /**
    * `jmouse-liveblocks` — the directives another product's document embeds.
    *

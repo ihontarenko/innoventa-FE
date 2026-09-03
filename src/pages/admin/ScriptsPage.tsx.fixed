@@ -1,0 +1,48 @@
+import { useEffect, useState } from "react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { Plus, RotateCcw, Trash2 } from "lucide-react"
+import { Alert, AlertDescription, Badge, Button, Input, Label, Skeleton, cn } from "@jmouse/ui"
+import type { CompletionCatalogue } from "@jmouse/codemirror/completion"
+import { PageHeader } from "@/components/PageHeader"
+import { detailOf } from "@/lib/apiErrors"
+import { ScriptSourcePane } from "@/components/scripts/ScriptSourcePane"
+import {
+  scriptsApi,
+  type ScriptDocumentDetail,
+  type ScriptDocumentRequest,
+  type ScriptDocumentSummary,
+} from "@/api/scripts"
+
+/**
+ * The workspace's jMS scripts — what should happen when an entry is written.
+ *
+ * ## ⚠️ The fourth question, and the first one with a screen
+ *
+ * Three jMouse dialects already have editors: `.jmp` answers *who may*, `.jmv` answers *what is valid*,
+ * jME answers *what a value is*. *What should happen* was a Java class and a redeploy. This is where it
+ * stops being one.
+ *
+ * ## ⚠️ This screen does not validate
+ *
+ * Every judgement on the page comes from the server: the gutter marks come from `POST /scripts/rehearse`
+ * running the real parser and the real binder, and the red strip above the editor is a refusal recorded
+ * at the last **boot** and stored on the row. A screen that decided a script was fine and was then
+ * contradicted at save is worse than one that never guessed.
+ *
+ * ## ⚠️ A refusal on the rail, not only in the open document
+ *
+ * `REFUSED` means the catalogue changed underneath a document nobody edited — a facade method taken out
+ * in a release. That is invisible by nature: nothing happened, somebody's rule simply stopped firing.
+ * So the state is a mark on every row, and the rail is the first thing the page draws.
+ *
+ * ## ⚠️ Completion degrades, it does not block
+ *
+ * The catalogue is fetched apart from the documents and its failure is swallowed. With it unreachable
+ * the editor still opens, still saves and still reverts, and simply offers nothing — which is the
+ * behaviour the ticket asks for in as many words.
+ */
+
+/** A document nobody has typed into yet — enough jMS to be a shape rather than a blank page. */
+const STARTER_SOURCE = `# What should happen when an entry is written.
+#
+# 

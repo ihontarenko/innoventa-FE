@@ -35,6 +35,12 @@
 @source "../node_modules/@jmouse/codemirror/dist";
 @source "../node_modules/@jmouse/query/dist";
 @source "../node_modules/@jmouse/avatars/dist";
+/* ⚠️ **A package missing from this list is a package whose classes are generated only by accident.**
+   `@jmouse/validation` was absent and its screens still looked mostly right — because every class it
+   used happened to be used somewhere in `src/` as well. The first class it did not share would have
+   rendered as nothing, with no error anywhere. Tailwind scans what it is pointed at, and a symlinked
+   dependency is not scanned by the `src/` glob. */
+@source "../node_modules/@jmouse/validation/dist";
 
 @theme {
   /* ⚠️ One typeface in all three text roles, and the reason is Cyrillic. Onest carries latin,

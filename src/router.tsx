@@ -7,17 +7,18 @@ import { BugReportPage } from "@/pages/BugReportPage"
 import { LandingPage } from "@/pages/landing/LandingPage"
 import AssistantPage from "@/pages/AssistantPage"
 import SavedViewsPage from "@/pages/SavedViewsPage"
-import { UiKitPage } from "@/pages/ui-kit/UiKitPage"
 import { SettingsPage } from "@/pages/settings/SettingsPage"
 import { SpaceSettingsPage } from "@/pages/space/SpaceSettingsPage"
 import { AccessControlRoomPage } from "@/pages/admin/AccessControlRoomPage"
 import { AdminPage } from "@/pages/admin/AdminPage"
 import { AiAdministrationPage } from "@/pages/admin/ai/AiAdministrationPage"
 import { InvitationsPage } from "@/pages/admin/InvitationsPage"
-import { MappingBuilderPage } from "@/pages/admin/MappingBuilderPage"
+import { ValidationDocumentsPage } from "@/pages/admin/ValidationDocumentsPage"
+import { ScriptsPage } from "@/pages/admin/ScriptsPage"
 import { PlanAdministrationPage } from "@/pages/admin/PlanAdministrationPage"
 import { PurposesPage } from "@/pages/admin/PurposesPage"
 import { SharingPage } from "@/pages/admin/SharingPage"
+import { ExchangeRatesPage } from "@/pages/admin/ExchangeRatesPage"
 import { SystemSettingsPage } from "@/pages/admin/SystemSettingsPage"
 import { WorkspaceAdministrationPage } from "@/pages/admin/WorkspaceAdministrationPage"
 import { AuditLogPage } from "@/pages/audit/AuditLogPage"
@@ -26,6 +27,7 @@ import { FormBuilderPage } from "@/pages/FormBuilderPage"
 import { FieldDetailPage } from "@/pages/workspace/FieldDetailPage"
 import { FormManagementPage } from "@/pages/workspace/FormManagementPage"
 import { ProjectDetailPage } from "@/pages/ProjectDetailPage"
+import { StocktakeDetailPage } from "@/pages/workspace/StocktakeDetailPage"
 import { PageDetailPage } from "@/pages/workspace/PageDetailPage"
 import { LabelStudioPage } from "@/pages/LabelStudioPage"
 import { HubPage } from "@/pages/HubPage"
@@ -167,6 +169,7 @@ export function ApplicationRoutes() {
             <Route path="/admin/invitations" element={<InvitationsPage />} />
             <Route path="/admin/crafts" element={<CraftsPage />} />
             <Route path="/admin/settings" element={<SystemSettingsPage />} />
+            <Route path="/admin/exchange-rates" element={<ExchangeRatesPage />} />
             <Route path="/admin/ai" element={<AiAdministrationPage />} />
             <Route path="/admin/shares" element={<SharingPage />} />
             <Route path="/admin/workspaces" element={<WorkspaceAdministrationPage />} />
@@ -174,16 +177,13 @@ export function ApplicationRoutes() {
             <Route path="/purposes" element={<PurposesPage />} />
           </Route>
 
-          <Route element={<NavigationScreenLayout screenKey="workbench" />}>
-            <Route path="/workbench" element={<NavigationScreenPage screenKey="workbench" />} />
-            {/* ⚠️ No permission and no data — the kit renders itself, so it answers with the backend down. */}
-            <Route path="/ui-kit" element={<UiKitPage />} />
-            <Route path="/admin/mapping" element={<MappingBuilderPage />} />
-          </Route>
-
           {/* ⚠️ Outside every rail, and that is the frequency rule made concrete: the audit log is
-              administration by any definition and stays a sidebar row because it is opened daily. */}
+              administration by any definition and stays a sidebar row because it is opened daily. The
+              validation documents are here for the same reason — they are opened in the middle of
+              building a form, not once at setup. */}
           <Route path="/audit" element={<AuditLogPage />} />
+          <Route path="/admin/validation" element={<ValidationDocumentsPage />} />
+          <Route path="/admin/scripts" element={<ScriptsPage />} />
 
           <Route path={`${SPACE_ROUTE_ROOT}/:spaceSlug/settings`} element={<SpaceSettingsPage />} />
           <Route path={`${SPACE_ROUTE_ROOT}/:spaceSlug/settings/:tab`} element={<SpaceSettingsPage />} />
@@ -200,6 +200,8 @@ export function ApplicationRoutes() {
               section nobody has built. */}
           <Route path={`${SPACE_ROUTE_ROOT}/:spaceSlug/fields/:fieldId`} element={<FieldDetailPage />} />
           <Route path={`${SPACE_ROUTE_ROOT}/:spaceSlug/projects/:projectId`} element={<ProjectDetailPage />} />
+          {/* ⚠️ A sheet is a record, so it has an address of its own — the section is the list. */}
+          <Route path={`${SPACE_ROUTE_ROOT}/:spaceSlug/stocktakes/:stocktakeId`} element={<StocktakeDetailPage />} />
 
           {/* ⚠️ Before the section catch-all: the studio is a screen of its own, not a section, and
               `labels/:templateId` would otherwise be read as a section named `labels/…`. */}

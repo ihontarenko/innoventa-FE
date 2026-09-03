@@ -68,13 +68,14 @@ interface NavigationPreferencesState {
 const EMPTY_PREFERENCES: NavigationPreferences = { inherited: [], scopes: {} }
 
 /**
- * Every destination reachable outside a workspace — the sidebar's rows, both screens' entries and the
- * manual, read off the navigation rather than listed twice.
+ * Every destination reachable outside a workspace — the sidebar's rows, the Administration screen's
+ * entries and the manual, read off the navigation rather than listed twice.
  *
  * ⚠️ **Deliberately the BROAD set, and only `splitFlatPreference` uses it.** Its job is telling a
  * platform key apart from a workspace one when the old flat array is carried across; a narrower set
- * would push `mapping-builder` and `ui-kit` into `inherited`, which is the default *every workspace*
- * starts from — one moved menu row would have hidden things in workspaces that never heard of it.
+ * would push a screen's own entries — `purposes`, `exchange-rates` — into `inherited`, which is the
+ * default *every workspace* starts from, and one moved menu row would then hide things in workspaces
+ * that never heard of it.
  */
 const PLATFORM_ITEM_KEYS = new Set(navigationItems.map((item) => item.key))
 
@@ -230,7 +231,8 @@ export const useNavigationPreferencesStore = create<NavigationPreferencesState>(
         if (flat) {
           // ⚠️ Split first, prune after — in that order. The split needs the BROAD platform set to tell
           // a platform key from a workspace one; pruning is about what the sidebar can draw, and asking
-          // the narrow set first would file `ui-kit` under `inherited` and hide things in workspaces.
+          // the narrow set first would file a screen's own entry under `inherited` and hide things in
+          // workspaces.
           const preferences = withoutRetiredPlatformKeys(splitFlatPreference(flat))
 
           set({ preferences, hydrated: true })

@@ -12,7 +12,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@jmouse/ui"
-import type { PricingOffer } from "@/api/pricing"
+import type { LookupOffer } from "@/api/lookup"
 import { formatPrice } from "./OfferCard"
 
 /**
@@ -28,7 +28,7 @@ export function OfferDetailSheet({
   onAdd,
   onClose,
 }: {
-  offer: PricingOffer
+  offer: LookupOffer
   provider: string
   onAdd?: () => void
   onClose: () => void

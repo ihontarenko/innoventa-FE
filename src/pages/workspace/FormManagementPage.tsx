@@ -77,7 +77,7 @@ export function FormManagementPage() {
       />
 
       {/* ⚠️ `base` (the default), because this address sits under the forms section — the platform's
-          own level. A component type's stock and pricing are edited from Component types, which is the
+          own level. A component type's stock and catalogue mapping are edited from Component types, which is the
           level that owns them; see `ManagementDepth`. */}
       <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col overflow-hidden rounded-lg border">
         <FormManagement form={form} />

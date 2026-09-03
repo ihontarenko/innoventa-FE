@@ -106,7 +106,7 @@ export interface PageBlockResponse {
       referenceDesignator: string | null
       componentDescription: string
       quantityRequired: number
-      stockQuantityCached: number | null
+      heldQuantity: number | null
       coverageStatus: MaterialCoverageStatus
     }>
   }

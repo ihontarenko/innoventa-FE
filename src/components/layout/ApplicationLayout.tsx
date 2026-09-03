@@ -1,5 +1,5 @@
 import { Outlet } from "react-router-dom"
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@jmouse/ui"
+import { ShortcutHelp, SidebarInset, SidebarProvider, SidebarTrigger } from "@jmouse/ui"
 import { ApplicationSidebar } from "@/components/layout/ApplicationSidebar"
 import { ImpersonationBanner } from "@/components/layout/ImpersonationBanner"
 import { SeasonalEffect } from "@/components/layout/SeasonalEffect"
@@ -13,6 +13,10 @@ export function ApplicationLayout() {
   return (
     <SidebarProvider>
       <SeasonalEffect />
+      {/* ⚠️ Mounted once, here, and it registers `?` itself. The list it prints is generated from
+          whatever the screen underneath has registered, so a screen gains a help entry by declaring a
+          shortcut and cannot gain one any other way. */}
+      <ShortcutHelp />
       <ApplicationSidebar />
       {/* ⚠️ **The frame is the window, and the scrollbar is inside it.** Without an explicit height the
           inset only has a *minimum* one, so a tall page grows the document and every screen that wants

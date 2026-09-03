@@ -38,19 +38,24 @@ import { readableMoment, relativeTime } from "@/lib/dates"
 import type { StorageLocation } from "@/api/storageLocations"
 
 type Movement = "issue" | "return" | "transfer" | "write-off"
-
 /**
  * One thing, and everywhere it has been.
  *
  * ⚠️ **The history is the point of this screen, not a footnote.** Custody exists so somebody can answer
- * "who had it in March" — a drawer that showed only the current holder would be a field on the entry, and
- * would not need a drawer at all.
+ * "who had it in March" — a panel that showed only the current holder would be a field on the entry, and
+ * would not need a panel at all.
  *
  * ⚠️ **Which movements are offered follows the state, and that is the whole rule.** Something on a shelf
  * can be issued; something out can be returned or transferred; something written off can do neither.
  * Offering all four always would mean three refusals for every action.
+ *
+ * ⚠️ **A body, not a sheet.** It was a `Sheet` — a modal that dimmed the list behind it — while Inventory
+ * showed the same kind of thing as a third column beside the rows. Ivan called that out in as many
+ * words: *«вилазить збоку якесь гівно а не так як на інвентарі»*. The chrome (the heading, the ✕, the
+ * column-or-overlay decision) belongs to `DetailsPanel`, which is what every list in this product now
+ * opens; this file supplies only what is inside it.
  */
-export function AssetDrawer({ assetId, onClose }: { assetId: string; onClose: () => void }) {
+export function AssetPanel({ assetId }: { assetId: string }) {
   const { data, isLoading } = useAsset(assetId)
   const [movement, setMovement] = useState<Movement | null>(null)
 
@@ -64,120 +69,100 @@ export function AssetDrawer({ assetId, onClose }: { assetId: string; onClose: ()
   const isClosed = asset?.state === "WRITTEN_OFF"
 
   return (
-    <Sheet open onOpenChange={(next) => !next && onClose()}>
-      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-lg">
-        <SheetHeader className="border-b px-4 py-3">
-          <SheetTitle className="flex flex-wrap items-center gap-2 text-sm">
-            {asset?.label ?? "Asset"}
-            {asset?.overdue && <Badge variant="destructive">overdue</Badge>}
-          </SheetTitle>
-          <SheetDescription className="text-xs">
-            {asset ? (asset.holderLabel ?? asset.locationPath ?? "nowhere in particular") : "Where it is, and who has had it."}
-          </SheetDescription>
-        </SheetHeader>
+    <div className="flex min-h-0 flex-1 flex-col gap-4 p-4">
+      {isLoading || !data ? (
+        <Skeleton className="h-64 w-full" />
+      ) : (
+        <>
+        {movement ? (
+          <MovementForm
+            assetId={assetId}
+            movement={movement}
+            onDone={() => setMovement(null)}
+            onCancel={() => setMovement(null)}
+          />
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {canIssue && <Button size="sm" onClick={() => setMovement("issue")}>Issue it</Button>}
+            {canReturn && (
+              <Button size="sm" variant="outline" onClick={() => setMovement("return")}>
+                Take it back
+              </Button>
+            )}
+            {canTransfer && (
+              <Button size="sm" variant="outline" onClick={() => setMovement("transfer")}>
+                Hand it on
+              </Button>
+            )}
+            {!isClosed && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-destructive hover:bg-destructive/10"
+                onClick={() => setMovement("write-off")}
+              >
+                Write it off
+              </Button>
+            )}
+            {isClosed && (
+              <p className="text-xs text-muted-foreground">
+                Written off — off the books, and kept only for its history.
+              </p>
+            )}
+          </div>
+        )}
 
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
-          {isLoading || !data ? (
-            <Skeleton className="h-64 w-full" />
+        {/* ⚠️ Above the history and below the movements, which is where it belongs in the
+            reading order: what state is it in now, then where has it been. Absent entirely
+            where the workspace does not watch its things — the drawer exists everywhere, the
+            watch is a paid module most workspaces do not have. */}
+        {watchesEquipment && (
+          <>
+            {/* ⚠️ Due first, readings second, inspections third — the order somebody scans in:
+                what needs doing, what the numbers say, what was checked. */}
+            <AssetMaintenance assetId={assetId} />
+            <AssetReadings assetId={assetId} />
+            <AssetInspections assetId={assetId} />
+          </>
+        )}
+
+        <RowGroup label="Where it has been" tally={`${data.history.length}`}>
+          {data.history.length === 0 ? (
+            <p className="rounded-md border border-dashed px-3 py-4 text-center text-xs text-muted-foreground">
+              Nothing recorded yet — it has been where it was registered ever since.
+            </p>
           ) : (
-            <>
-              {movement ? (
-                <MovementForm
-                  assetId={assetId}
-                  movement={movement}
-                  onDone={() => setMovement(null)}
-                  onCancel={() => setMovement(null)}
-                />
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {canIssue && <Button size="sm" onClick={() => setMovement("issue")}>Issue it</Button>}
-                  {canReturn && (
-                    <Button size="sm" variant="outline" onClick={() => setMovement("return")}>
-                      Take it back
-                    </Button>
-                  )}
-                  {canTransfer && (
-                    <Button size="sm" variant="outline" onClick={() => setMovement("transfer")}>
-                      Hand it on
-                    </Button>
-                  )}
-                  {!isClosed && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-destructive hover:bg-destructive/10"
-                      onClick={() => setMovement("write-off")}
-                    >
-                      Write it off
-                    </Button>
-                  )}
-                  {isClosed && (
-                    <p className="text-xs text-muted-foreground">
-                      Written off — off the books, and kept only for its history.
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* ⚠️ Above the history and below the movements, which is where it belongs in the
-                  reading order: what state is it in now, then where has it been. Absent entirely
-                  where the workspace does not watch its things — the drawer exists everywhere, the
-                  watch is a paid module most workspaces do not have. */}
-              {watchesEquipment && (
-                <>
-                  {/* ⚠️ Due first, readings second, inspections third — the order somebody scans in:
-                      what needs doing, what the numbers say, what was checked. */}
-                  <AssetMaintenance assetId={assetId} />
-                  <AssetReadings assetId={assetId} />
-                  <AssetInspections assetId={assetId} />
-                </>
-              )}
-
-              <RowGroup label="Where it has been" tally={`${data.history.length}`}>
-                {data.history.length === 0 ? (
-                  <p className="rounded-md border border-dashed px-3 py-4 text-center text-xs text-muted-foreground">
-                    Nothing recorded yet — it has been where it was registered ever since.
-                  </p>
-                ) : (
-                  <RowList>
-                    {data.history.map((entry) => (
-                      <Row
-                        key={entry.id}
-                        // ⚠️ The open one is marked, because "who has it now" is the question people
-                        // scan a history for — and it is the row with no return date, which is easy to
-                        // miss among ten.
-                        className={cn(!entry.returnedAt && "border-l-2 border-l-primary bg-primary/5")}
-                        trailing={
-                          entry.overdue ? (
-                            <Badge variant="destructive">was overdue</Badge>
-                          ) : entry.conditionCode ? (
-                            <Badge variant="outline">{entry.conditionCode.toLowerCase()}</Badge>
-                          ) : undefined
-                        }
-                      >
-                        <RowTitle>{entry.holderLabel ?? entry.locationPath ?? "—"}</RowTitle>
-                        <RowMeta>
-                          {readableMoment(entry.issuedAt)}
-                          {entry.returnedAt ? ` → ${readableMoment(entry.returnedAt)}` : " → still out"}
-                          {entry.dueAt && !entry.returnedAt ? ` · due ${relativeTime(entry.dueAt)}` : ""}
-                        </RowMeta>
-                        {entry.note && <RowMeta>{entry.note}</RowMeta>}
-                      </Row>
-                    ))}
-                  </RowList>
-                )}
-              </RowGroup>
-            </>
+            <RowList>
+              {data.history.map((entry) => (
+                <Row
+                  key={entry.id}
+                  // ⚠️ The open one is marked, because "who has it now" is the question people
+                  // scan a history for — and it is the row with no return date, which is easy to
+                  // miss among ten.
+                  className={cn(!entry.returnedAt && "border-l-2 border-l-primary bg-primary/5")}
+                  trailing={
+                    entry.overdue ? (
+                      <Badge variant="destructive">was overdue</Badge>
+                    ) : entry.conditionCode ? (
+                      <Badge variant="outline">{entry.conditionCode.toLowerCase()}</Badge>
+                    ) : undefined
+                  }
+                >
+                  <RowTitle>{entry.holderLabel ?? entry.locationPath ?? "—"}</RowTitle>
+                  <RowMeta>
+                    {readableMoment(entry.issuedAt)}
+                    {entry.returnedAt ? ` → ${readableMoment(entry.returnedAt)}` : " → still out"}
+                    {entry.dueAt && !entry.returnedAt ? ` · due ${relativeTime(entry.dueAt)}` : ""}
+                  </RowMeta>
+                  {entry.note && <RowMeta>{entry.note}</RowMeta>}
+                </Row>
+              ))}
+            </RowList>
           )}
-        </div>
-
-        <div className="border-t p-4">
-          <Button variant="outline" onClick={onClose}>
-            Close
-          </Button>
-        </div>
-      </SheetContent>
-    </Sheet>
+        </RowGroup>
+        </>
+      )}
+    </div>
   )
 }
 
@@ -376,4 +361,40 @@ function flatten(nodes: StorageLocation[], depth = 0): Array<{ location: Storage
     { location, depth },
     ...flatten(location.children ?? [], depth + 1),
   ])
+}
+
+/**
+ * The same panel, as an overlay — for the places that are not a list with a column to spare.
+ *
+ * ⚠️ **This exists so the sheet is a DELIBERATE choice rather than the default.** A list screen opens
+ * `AssetPanel` inside `DetailsPanel` and gets a column beside the rows; a station, the attention board
+ * and a servicing queue open it over what they were showing, because none of them has a third column
+ * and none of them is a list somebody scans while reading the panel. One body, two frames — never two
+ * bodies drifting apart.
+ */
+export function AssetSheet({ assetId, onClose }: { assetId: string; onClose: () => void }) {
+  const { data } = useAsset(assetId)
+  const asset = data?.asset
+
+  return (
+    <Sheet open onOpenChange={(next) => !next && onClose()}>
+      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-lg">
+        <SheetHeader className="border-b px-4 py-3">
+          <SheetTitle className="flex flex-wrap items-center gap-2 text-sm">
+            {asset?.label ?? "Asset"}
+            {asset?.overdue && <Badge variant="destructive">overdue</Badge>}
+          </SheetTitle>
+          <SheetDescription className="text-xs">
+            {asset
+              ? (asset.holderLabel ?? asset.locationPath ?? "nowhere in particular")
+              : "Where it is, and who has had it."}
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <AssetPanel assetId={assetId} />
+        </div>
+      </SheetContent>
+    </Sheet>
+  )
 }

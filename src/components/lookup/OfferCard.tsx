@@ -1,5 +1,5 @@
 import { Badge, Button, cn } from "@jmouse/ui"
-import type { PricingOffer } from "@/api/pricing"
+import type { LookupOffer } from "@/api/lookup"
 
 /** ⚠️ Two decimals is wrong for a part that costs 0.0032 — a price of "0.00" reads as free. */
 export function formatPrice(amount: number): string {
@@ -21,7 +21,7 @@ export function OfferCard({
   onOpen,
   onAdd,
 }: {
-  offer: PricingOffer
+  offer: LookupOffer
   onOpen: () => void
   onAdd?: () => void
 }) {

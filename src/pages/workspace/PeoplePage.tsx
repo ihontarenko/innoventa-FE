@@ -1,21 +1,10 @@
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
-import {
-  Badge,
-  Button,
-  cn,
-  Input,
-  Row,
-  RowList,
-  RowMeta,
-  RowTitle,
-  Skeleton,
-} from "@jmouse/ui"
-import { PageHeader } from "@/components/PageHeader"
-import { ToggleChip } from "@/components/ToggleChip"
-import { HolderDrawer } from "@/components/custody/HolderDrawer"
+import { Badge, DetailsPanel, cn, useDetailsPanel } from "@jmouse/ui"
+import { DataTable } from "@/components/layout/DataTable"
+import { ListScreen } from "@/components/layout/ListScreen"
+import { HolderPanel } from "@/components/custody/HolderPanel"
 import { EntryFormDialog } from "@/components/form/EntryFormDialog"
-import { LoadFailureNotice } from "@/components/LoadFailureNotice"
 import { useHolderForms, useHolders } from "@/hooks/useCustody"
 import { useCreateEntry } from "@/hooks/useWorkspaceForms"
 import { capitalised, useTerm } from "@/hooks/useTerminology"
@@ -25,19 +14,23 @@ import type { Holder } from "@/api/custody"
 /**
  * Who can be carrying something here, and what each of them has.
  *
- * ⚠️ **These are entries, not accounts.** A holder is a submission on a form whose purpose is
+ * ⚠️ **These are entries, not accounts.** A person here is a submission on a form whose purpose is
  * `HOLDER` — an employee, a crew, a rental client — and none of them need ever have logged in. The
  * screen that lists people with accounts is `/admin/access`, and conflating the two would put a
  * workspace's members in the issue picker and the store's casual staff nowhere.
  *
+ * ⚠️ **The word on screen is the workspace's**, through `term('holder.many')` — the electronics area
+ * says *Personnel*. The model keeps its neutral noun because a crew and a rental client really are one
+ * mechanism; what a person reads is the customer's word for it.
+ *
+ * ⚠️ **The same shell as Inventory**, through `ListScreen`. This screen used to arrange its own header,
+ * put its type filters in the body as chips, and draw a card list — three departures from every other
+ * list in the product, none of them wrong on its own. The rail carries the types of person, the chips
+ * carry the two questions somebody actually arrives with, and the rows are a table like everywhere else.
+ *
  * ⚠️ **The counts come from the server, in one query for everybody.** `CustodyPickers.holders` runs a
  * single grouped count of open possessions; the alternative is one request per row, and a screen that
- * asks forty questions to draw forty lines is a screen that is wrong by the time it finishes.
- *
- * ⚠️ **The word on screen is "People", and the model's word is "holder".** A crew and a rental client
- * are the same mechanism as a person, but nobody staffing a store thinks in it — so the model keeps
- * its noun and the interface says the ordinary one. Step 23 of the roadmap replaces this English
- * literal with a term the workspace chooses.
+ * asks forty questions to draw forty lines is wrong by the time it finishes.
  */
 export function PeoplePage() {
   const query = useHolders()
@@ -51,12 +44,16 @@ export function PeoplePage() {
   const people = term("holder.many", "people")
   const thing = term("thing.one", "thing")
 
-  const [formId, setFormId] = useState<string | undefined>(undefined)
+  const [formName, setFormName] = useState<string | null>(null)
   const [carryingOnly, setCarryingOnly] = useState(false)
   const [lateOnly, setLateOnly] = useState(false)
   const [typed, setTyped] = useState("")
-  const [openHolder, setOpenHolder] = useState<Holder | null>(null)
+  /* ⚠️ **The same peek Inventory opens, not a modal sheet.** It was a `Sheet` that dimmed the list
+     behind it while Inventory showed the same kind of thing as a third full-height column — the exact
+     difference Ivan pointed an arrow at. `useDetailsPanel` decides column-or-overlay by width. */
+  const peek = useDetailsPanel<Holder>()
   const [addingToFormId, setAddingToFormId] = useState<string | null>(null)
+  const searchBox = useRef<HTMLInputElement>(null)
 
   const holders = useMemo(() => query.data ?? [], [query.data])
 
@@ -69,108 +66,175 @@ export function PeoplePage() {
     const needle = typed.trim().toLowerCase()
 
     return holders
-      .filter((holder) => (formId ? holder.formName === formNameOf(holderForms, formId) : true))
+      .filter((holder) => (formName ? holder.formName === formName : true))
       .filter((holder) => (carryingOnly ? holder.holding > 0 : true))
       .filter((holder) => (lateOnly ? holder.overdue > 0 : true))
       .filter((holder) => (needle ? holder.label.toLowerCase().includes(needle) : true))
       .sort(byLatenessThenLoad)
-  }, [holders, holderForms, formId, carryingOnly, lateOnly, typed])
+  }, [holders, formName, carryingOnly, lateOnly, typed])
 
   const carrying = holders.filter((holder) => holder.holding > 0).length
   const late = holders.filter((holder) => holder.overdue > 0).length
 
-  if (failure) {
-    return <LoadFailureNotice failure={failure} onRetry={() => void query.refetch()} />
-  }
+  /**
+   * ⚠️ **The rail lists the FORMS that describe people**, which is the same role types play on
+   * Inventory. A workspace with staff and crews has two; one with neither has an empty rail and an
+   * empty screen, which agree with each other.
+   */
+  const railItems = holderForms.map((form) => ({
+    key: form.name,
+    icon: "☺",
+    label: form.name,
+    count: holders.filter((holder) => holder.formName === form.name).length,
+  }))
 
   return (
     <>
-      <PageHeader
+      <ListScreen
         title={capitalised(people)}
         description={describe(holders.length, carrying, late, person, people)}
-        actions={
-          <>
-            <ToggleChip
-              active={carryingOnly}
-              title="Only people who have something out right now"
-              onClick={() => setCarryingOnly((previous) => !previous)}
-            >
-              Carrying
-            </ToggleChip>
-
-            <ToggleChip
-              active={lateOnly}
-              title="Only people holding something that was due back already"
-              onClick={() => setLateOnly((previous) => !previous)}
-            >
-              Late
-            </ToggleChip>
-
-            <Input
-              className="h-8 w-56 text-sm"
-              value={typed}
-              placeholder={`Find a ${person}…`}
-              onChange={(event) => setTyped(event.target.value)}
-            />
-
-            {/* ⚠️ Adding a person is adding an ENTRY, on whichever form describes people here. Where a
-                workspace has more than one such form — staff and crews, say — the button offers each,
-                because picking for somebody would file a subcontractor as an employee. */}
-            {holderForms.map((form) => (
-              <Button key={form.id} size="sm" onClick={() => setAddingToFormId(form.id)}>
-                {holderForms.length === 1 ? `Add a ${person}` : `Add: ${form.name}`}
-              </Button>
-            ))}
-          </>
+        search={{
+          value: typed,
+          onChange: setTyped,
+          placeholder: `Search ${people}… ( / )`,
+          inputRef: searchBox,
+        }}
+        chips={[
+          {
+            label: "Carrying",
+            active: carryingOnly,
+            count: carrying,
+            title: `Only ${people} who have something out right now`,
+            onClick: () => setCarryingOnly((previous) => !previous),
+          },
+          {
+            label: "Late",
+            active: lateOnly,
+            count: late,
+            title: `Only ${people} holding something that was due back already`,
+            onClick: () => setLateOnly((previous) => !previous),
+          },
+        ]}
+        /* ⚠️ Adding a person is adding an ENTRY, on whichever form describes people here. Where a
+           workspace has more than one such form — staff and crews — each gets its own button, because
+           picking for somebody would file a subcontractor as an employee. */
+        action={
+          holderForms.length === 1
+            ? { label: `Add ${person}`, onClick: () => setAddingToFormId(holderForms[0].id) }
+            : undefined
         }
-      />
+        extraActions={
+          holderForms.length > 1
+            ? holderForms.map((form) => (
+                <button
+                  key={form.id}
+                  type="button"
+                  className="border-border hover:bg-accent h-8 rounded-md border px-2.5 text-[13px]"
+                  onClick={() => setAddingToFormId(form.id)}
+                >
+                  Add: {form.name}
+                </button>
+              ))
+            : undefined
+        }
+        rail={
+          holderForms.length > 0
+            ? {
+                title: "Kind",
+                items: railItems,
+                activeKey: formName,
+                onSelect: setFormName,
+                allLabel: `All ${people}`,
+                allIcon: "☰",
+                allCount: holders.length,
+              }
+            : undefined
+        }
+        failure={failure}
+        onRetry={() => void query.refetch()}
+        loading={query.isLoading}
+        loadingRows={10}
+        isEmpty={shown.length === 0}
+        empty={{
+          title: holders.length === 0 ? `No ${people} yet` : "Nobody here matches that",
+          text:
+            holders.length === 0
+              ? holderForms.length > 0
+                ? `Add somebody, and a ${thing} can be handed to them.`
+                : `This workspace has no form describing ${people} — add one with the purpose HOLDER in the form library.`
+              : "Widen the search, or clear the chips above.",
+          actions:
+            holders.length === 0 && holderForms.length > 0
+              ? [
+                  {
+                    label: `Add ${person}`,
+                    primary: true,
+                    onClick: () => setAddingToFormId(holderForms[0].id),
+                  },
+                ]
+              : [],
+        }}
+        /* ⚠️ **A peek, as the third column** — the same one Inventory opens, so the two screens behave
+            alike rather than each teaching its own way of looking at a row. */
+        detail={{
+          open: Boolean(peek.subject) && !peek.narrow,
+          node: peek.subject && (
+            <DetailsPanel
+              state={peek}
+              title={peek.subject.label}
+              description={
+                peek.subject.formName +
+                (peek.subject.overdue > 0 ? ` · ${peek.subject.overdue} overdue` : "")
+              }
+            >
+              <HolderPanel holder={peek.subject} />
+            </DetailsPanel>
+          ),
+        }}
+      >
+        <DataTable
+          rows={shown}
+          rowKey={(holder) => holder.entryId}
+          onRowClick={(holder) => peek.show(holder)}
+          columns={[
+            {
+              key: "label",
+              header: capitalised(person),
+              className: "max-w-72 truncate font-medium",
+              cell: (holder) => holder.label,
+            },
+            {
+              key: "form",
+              header: "Kind",
+              className: "text-muted-foreground",
+              cell: (holder) => holder.formName,
+            },
+            {
+              key: "holding",
+              header: "Holding",
+              align: "right",
+              cell: (holder) =>
+                holder.holding === 0 ? <span className="text-muted-foreground">—</span> : holder.holding,
+            },
+            {
+              key: "overdue",
+              header: "Overdue",
+              align: "right",
+              /* ⚠️ The one number this screen is read for. Whoever opens it is chasing something down,
+                 so a late row is marked rather than merely counted. */
+              cell: (holder) =>
+                holder.overdue === 0 ? (
+                  <span className="text-muted-foreground">—</span>
+                ) : (
+                  <Badge variant="destructive" className={cn("font-normal")}>
+                    {holder.overdue}
+                  </Badge>
+                ),
+            },
+          ]}
+        />
+      </ListScreen>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-3">
-        {/* ⚠️ Chips rather than a filter column: `FilterPanel` is for a catalogue — many choices, named
-            by the customer, carrying counts — and a workspace has one or two forms describing people.
-            Three hundred pixels of chrome for one line of meaning is the case its own header warns off. */}
-        {holderForms.length > 1 && (
-          <div className="flex flex-wrap gap-1.5">
-            <ToggleChip active={!formId} onClick={() => setFormId(undefined)}>
-              Everyone
-            </ToggleChip>
-            {holderForms.map((form) => (
-              <ToggleChip
-                key={form.id}
-                active={formId === form.id}
-                onClick={() => setFormId(formId === form.id ? undefined : form.id)}
-              >
-                {form.name}
-              </ToggleChip>
-            ))}
-          </div>
-        )}
-
-        <div className="flex min-w-0 flex-col gap-3">
-          {query.isLoading ? (
-            <Skeleton className="h-64 w-full" />
-          ) : holders.length === 0 ? (
-            <NobodyYet
-              thing={thing}
-              people={people}
-              hasHolderForm={holderForms.length > 0}
-              onAdd={() => setAddingToFormId(holderForms[0]?.id ?? null)}
-            />
-          ) : shown.length === 0 ? (
-            <div className="rounded-md border border-dashed px-6 py-10 text-center text-sm text-muted-foreground">
-              Nobody here matches that.
-            </div>
-          ) : (
-            <RowList>
-              {shown.map((holder) => (
-                <PersonRow key={holder.entryId} holder={holder} onOpen={() => setOpenHolder(holder)} />
-              ))}
-            </RowList>
-          )}
-        </div>
-      </div>
-
-      {openHolder && <HolderDrawer holder={openHolder} onClose={() => setOpenHolder(null)} />}
 
       {addingToFormId && (
         <EntryFormDialog
@@ -207,86 +271,17 @@ function byLatenessThenLoad(one: Holder, other: Holder) {
   return one.label.localeCompare(other.label)
 }
 
-function formNameOf(forms: Array<{ id: string; name: string }>, formId: string) {
-  return forms.find((form) => form.id === formId)?.name
-}
-
 function describe(total: number, carrying: number, late: number, person: string, people: string) {
   if (total === 0) {
-    return `No ${people} who can be handed anything — yet`
+    return `Nobody yet`
   }
 
-  const load = carrying === 0 ? "nobody is carrying anything" : `${carrying} carrying something`
-  const counted = `${total} ${total === 1 ? person : people}`
+  const noun = total === 1 ? person : people
+  const parts = [`${total} ${noun}`, `${carrying} carrying`]
 
-  return late > 0 ? `${counted} — ${load}, ${late} late` : `${counted} — ${load}`
-}
+  if (late > 0) {
+    parts.push(`${late} late`)
+  }
 
-/**
- * ⚠️ **Two different empties, and only one of them is the user's to fix.** A workspace with no holder
- * form has nowhere to put a person, and telling somebody to "add one" would lead to a button that
- * cannot exist. A workspace that has the form and nobody on it is one click from working.
- */
-function NobodyYet({
-  thing,
-  people,
-  hasHolderForm,
-  onAdd,
-}: {
-  thing: string
-  people: string
-  hasHolderForm: boolean
-  onAdd: () => void
-}) {
-  return (
-    <div className="flex flex-col items-center gap-1.5 rounded-md border border-dashed px-6 py-10 text-center">
-      <span aria-hidden="true" className="text-2xl">
-        ☺
-      </span>
-      <span className="text-sm font-medium">No {people} yet</span>
-
-      {hasHolderForm ? (
-        <>
-          <span className="max-w-md text-xs text-muted-foreground">
-            A {thing} cannot be handed over until there is somebody to hand it to. These are entries in
-            this workspace, not accounts — an employee, a crew, a rental client. Nobody needs to sign in
-            to carry a drill.
-          </span>
-          <Button size="sm" className="mt-2" onClick={onAdd}>
-            Add the first one
-          </Button>
-        </>
-      ) : (
-        <span className="max-w-md text-xs text-muted-foreground">
-          This workspace has no form describing {people}. One is created with the purpose{" "}
-          <code className="font-mono text-[0.7rem]">HOLDER</code> in the form library, and everybody on
-          it appears here.
-        </span>
-      )}
-    </div>
-  )
-}
-
-function PersonRow({ holder, onOpen }: { holder: Holder; onOpen: () => void }) {
-  const carrying = holder.holding > 0
-
-  return (
-    <Row
-      onOpen={onOpen}
-      // ⚠️ Late paints the row, the same way it does on the asset board — one visual language for one
-      // fact, so somebody scanning either screen is scanning for the same thing.
-      className={cn(holder.overdue > 0 && "border-l-2 border-l-destructive bg-destructive/5")}
-      leading={<span aria-hidden="true">{carrying ? "→" : "☺"}</span>}
-      trailing={
-        <>
-          {holder.overdue > 0 && <Badge variant="destructive">{holder.overdue} late</Badge>}
-          {carrying && <Badge variant="outline">{holder.holding} out</Badge>}
-          <Badge variant="secondary">{holder.formName}</Badge>
-        </>
-      }
-    >
-      <RowTitle>{holder.label}</RowTitle>
-      <RowMeta>{carrying ? `Carrying ${holder.holding}` : "Carrying nothing"}</RowMeta>
-    </Row>
-  )
+  return parts.join(" · ")
 }

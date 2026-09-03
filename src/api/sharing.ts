@@ -96,7 +96,7 @@ export interface PublicResolveResponse {
 
 export const publicSharingApi = {
     /** Resolve a pretty path (no auth) — for the SPA's catch-all pretty-URL route. */
-    resolve: (path: string) => http.get<PublicResolveResponse>('/public/share/resolve', { params: { path } }),
+    resolve: (path: string) => http.get<PublicResolveResponse>('/public/shares/resolve', { params: { path } }),
 };
 
 /** The in-app public route a resource type's token renders at, e.g. `/_/category/{token}`. */

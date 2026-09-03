@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react"
-import { Badge, Button, Input, Skeleton, cn } from "@jmouse/ui"
+import { Badge, Button, Input, NativeSelect, Skeleton, cn } from "@jmouse/ui"
 import { useAccessSimulation } from "@/hooks/useAccess"
 import { useAdminPermissions, useAdminUsers } from "@/hooks/useAdministration"
 import { useSpaces } from "@/hooks/useSpaces"
@@ -45,9 +45,9 @@ export function SimulatePanel() {
   return (
     <div className="flex flex-col gap-4">
       <form className="flex flex-wrap items-center gap-2" onSubmit={run}>
-        <select
+        <NativeSelect
           aria-label="Subject"
-          className="h-9 min-w-56 rounded-md border bg-transparent px-2 text-sm shadow-xs"
+          className="min-w-56"
           value={userId}
           onChange={(event) => change(setUserId)(event.target.value)}
         >
@@ -57,7 +57,7 @@ export function SimulatePanel() {
               {person.displayName || person.email}
             </option>
           ))}
-        </select>
+        </NativeSelect>
 
         {/* A datalist rather than a plain box: the catalogue is what exists, and a typo answers
             "refused" for a permission that was never asked about. */}
@@ -74,9 +74,9 @@ export function SimulatePanel() {
           ))}
         </datalist>
 
-        <select
+        <NativeSelect
           aria-label="Where"
-          className="h-9 min-w-48 rounded-md border bg-transparent px-2 text-sm shadow-xs"
+          className="min-w-48"
           value={spaceId}
           onChange={(event) => change(setSpaceId)(event.target.value)}
         >
@@ -86,7 +86,7 @@ export function SimulatePanel() {
               {space.name}
             </option>
           ))}
-        </select>
+        </NativeSelect>
 
         <Button type="submit" disabled={!userId || !permission}>
           Decide

@@ -18,15 +18,28 @@ import {
 } from "@jmouse/ui"
 import { PlainSelect } from "@/components/access/PolicyEditingKit"
 import { SYNONYM_GROUP_MANUFACTURER } from "@/api/valueSynonyms"
-import type { PricingOffer } from "@/api/pricing"
+import type { LookupOffer } from "@/api/lookup"
 import { useForm } from "@/hooks/useForms"
 import { useWorkspaceForms } from "@/hooks/useWorkspaceForms"
 import { useCreateValueSynonym, useValueSynonyms } from "@/hooks/useValueSynonyms"
 import { PRICING_CONFIG_KEYS } from "@/lib/formConfigs"
-import { OFFER_MAPPINGS, coerceForField, type CoercionStatus } from "@/lib/lookupMapping"
+import {
+  OFFER_MAPPINGS,
+  coerceForField,
+  isCurrencyLost,
+  synonymsForMapping,
+  type CoercionStatus,
+} from "@/lib/lookupMapping"
 import type { FieldDetail } from "@/types"
 
-const INVENTORY = "INVENTORY"
+/**
+ * ⚠️ **The component types, which are `CATALOG` forms — this said `INVENTORY` until the purposes
+ * swapped roles.** A distributor's answer describes a *part*: its manufacturer, its package, its
+ * datasheet. Those are the catalogue's fields and the `catalogue.*` mapping this dialog reads is
+ * declared on catalogue forms — so after the swap it offered the one position schema, whose mapping is
+ * empty, and the dialog reported having nothing to map onto.
+ */
+const COMPONENT_TYPE_PURPOSE = "CATALOG"
 
 const STATUS_MARK: Record<CoercionStatus, { label: string; tone: "plain" | "good" | "warn" } | null> = {
   text: null,
@@ -40,7 +53,7 @@ const STATUS_MARK: Record<CoercionStatus, { label: string; tone: "plain" | "good
  *
  * ⚠️ **This is the one place the two levels legitimately meet, and the direction matters.** The lookup is
  * the high level — it is about electronics, and it knows nothing about any particular form. The type is
- * the low level. What joins them is the type's own `pricing.*` configuration, so the lookup never guesses
+ * the low level. What joins them is the type's own `catalogue.*` configuration, so the lookup never guesses
  * which of a form's twenty fields means "manufacturer": either the form says, or the mapping is empty and
  * this dialog says so.
  *
@@ -53,12 +66,12 @@ export function AddFromLookupDialog({
   onMapped,
   onClose,
 }: {
-  offer: PricingOffer
+  offer: LookupOffer
   /** Handed the form and the values it should open prefilled with. */
   onMapped: (formId: string, values: Record<string, string>) => void
   onClose: () => void
 }) {
-  const { data: types = [], isLoading: typesLoading } = useWorkspaceForms(INVENTORY)
+  const { data: types = [], isLoading: typesLoading } = useWorkspaceForms(COMPONENT_TYPE_PURPOSE)
   const [selectedFormId, setSelectedFormId] = useState("")
 
   const { data: form, isLoading: formLoading } = useForm(selectedFormId || undefined)
@@ -77,15 +90,21 @@ export function AddFromLookupDialog({
 
     return OFFER_MAPPINGS.flatMap((mapping) => {
       const fieldName = configs[mapping.configKey]?.trim()
-      const raw = mapping.read(offer)
 
-      if (!fieldName || !raw) {
+      if (!fieldName) {
         return []
       }
 
+      // ⚠️ The field is resolved BEFORE the value is read, not after. A price carries its currency only
+      // where the field it is going into can hold one, so the mapping has to be told what it is writing to.
       const field = byName.get(fieldName) as FieldDetail | undefined
-      const isManufacturer = mapping.configKey === PRICING_CONFIG_KEYS.MANUFACTURER_FIELD
-      const coerced = coerceForField(raw, field, isManufacturer ? manufacturerSynonyms : [])
+      const raw = mapping.read(offer, field)
+
+      if (!raw) {
+        return []
+      }
+
+      const coerced = coerceForField(raw, field, synonymsForMapping(mapping.configKey, manufacturerSynonyms))
 
       return [{ mapping, fieldName, field, raw, ...coerced }]
     })
@@ -98,6 +117,10 @@ export function AddFromLookupDialog({
   )
 
   const unmatched = mapped.filter((entry) => entry.status === "unmatched")
+
+  const currencyIsLost = mapped.some(
+    (entry) => entry.mapping.configKey === PRICING_CONFIG_KEYS.PRICE_FIELD && isCurrencyLost(offer, entry.field),
+  )
 
   return (
     <Dialog open onOpenChange={(next) => !next && onClose()}>
@@ -162,6 +185,18 @@ export function AddFromLookupDialog({
                 })}
               </RowList>
             </RowGroup>
+          )}
+
+          {/* ⚠️ Said here because this is the last moment anybody can prevent it. The price is written
+              either way; what is lost is the currency, and only the person choosing the type can change
+              a plain number field into one that holds a unit. */}
+          {currencyIsLost && (
+            <p className="mt-3 rounded-md border border-dashed p-2.5 text-[11px] text-muted-foreground">
+              ⚠️ The distributor quoted this in <span className="font-mono">{offer.currency}</span>, and
+              the price field of this type is a plain number — so the amount is recorded and the currency
+              is not. It will not join the workspace's total until that field holds a value and a unit
+              together, which is its Catalogue pane's to change.
+            </p>
           )}
 
           {unmatched.length > 0 && (

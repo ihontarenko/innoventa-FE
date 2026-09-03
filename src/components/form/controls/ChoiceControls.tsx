@@ -1,5 +1,5 @@
 import { Check } from "lucide-react"
-import { cn } from "@jmouse/ui"
+import { NativeSelect, cn } from "@jmouse/ui"
 import { optionsOf } from "@/lib/fieldOptions"
 import { selectedValuesOf, toggleValue, type ControlProperties } from "./types"
 
@@ -27,11 +27,11 @@ export function SelectControl({ field, value, onChange, hasError }: ControlPrope
   const options = optionsOf(field)
 
   return (
-    <select
+    <NativeSelect
       id={`field-${field.id}`}
       aria-invalid={hasError || undefined}
       className={cn(
-        "h-9 w-full rounded-md border bg-transparent px-2 text-sm shadow-xs",
+        "w-full",
         hasError && "border-destructive",
       )}
       value={value}
@@ -43,7 +43,7 @@ export function SelectControl({ field, value, onChange, hasError }: ControlPrope
           {option.label}
         </option>
       ))}
-    </select>
+    </NativeSelect>
   )
 }
 

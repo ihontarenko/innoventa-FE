@@ -20,10 +20,14 @@ export function useStorageLocations() {
   })
 }
 
-export function useLocationContents(locationId: string | undefined) {
+/**
+ * @param deep whether what is inside this place counts too. ⚠️ Part of the key, or switching the toggle
+ *             shows the previous answer under the new label
+ */
+export function useLocationContents(locationId: string | undefined, deep = false) {
   return useQuery<LocationItem[]>({
-    queryKey: LOCATION_KEYS.contents(locationId ?? ""),
-    queryFn: () => storageLocationsApi.contents(locationId!).then((response) => response.data),
+    queryKey: [...LOCATION_KEYS.contents(locationId ?? ""), deep],
+    queryFn: () => storageLocationsApi.contents(locationId!, deep).then((response) => response.data),
     enabled: Boolean(locationId),
   })
 }

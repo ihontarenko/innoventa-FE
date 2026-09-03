@@ -1,4 +1,4 @@
-import { Input, Switch, Textarea, cn } from "@jmouse/ui"
+import { Input, NativeSelect, Switch, Textarea, cn } from "@jmouse/ui"
 import type { ConfigEntry } from "@/lib/formConfigCatalogue"
 import type { FieldDetail } from "@/types"
 
@@ -28,10 +28,12 @@ export function ConfigControl({
   if (control.kind === "field" || control.kind === "fields") {
     // ⚠️ Narrowed by element type where the key only makes sense for some — offering a text field as a
     // thumbnail is offering a setting that cannot work.
-    const eligible =
-      control.kind === "field" && control.accepts
-        ? fields.filter((field) => control.accepts!.includes(field.elementType))
-        : fields
+    // ⚠️ Both kinds honour it. While only the single-field one did, a multi-field key that names element
+    // types — *which values become filter links* — offered every field on the form, including the ones a
+    // filter over them would give a one-row list per distinct measurement.
+    const eligible = control.accepts
+      ? fields.filter((field) => control.accepts!.includes(field.elementType))
+      : fields
 
     if (control.kind === "fields") {
       const selected = value ? value.split(",").map((name) => name.trim()).filter(Boolean) : []
@@ -66,8 +68,8 @@ export function ConfigControl({
     }
 
     return (
-      <select
-        className="h-9 w-full rounded-md border bg-transparent px-2 text-sm shadow-xs"
+      <NativeSelect
+        className="w-full"
         value={value}
         onChange={(event) => onChange(event.target.value)}
       >
@@ -77,7 +79,7 @@ export function ConfigControl({
             {field.label}
           </option>
         ))}
-      </select>
+      </NativeSelect>
     )
   }
 
@@ -94,8 +96,8 @@ export function ConfigControl({
 
   if (control.kind === "choice") {
     return (
-      <select
-        className="h-9 w-full rounded-md border bg-transparent px-2 text-sm shadow-xs"
+      <NativeSelect
+        className="w-full"
         value={value}
         onChange={(event) => onChange(event.target.value)}
       >
@@ -105,7 +107,7 @@ export function ConfigControl({
             {option.label}
           </option>
         ))}
-      </select>
+      </NativeSelect>
     )
   }
 

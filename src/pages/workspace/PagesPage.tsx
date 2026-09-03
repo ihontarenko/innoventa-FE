@@ -1,12 +1,12 @@
 import { useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
-import { Badge, Button, type FilterItem, FilterPanel, Input, Skeleton } from "@jmouse/ui"
+import { Badge, Button, type FilterItem } from "@jmouse/ui"
 import { ExternalLink, Pencil, Upload } from "lucide-react"
 import { CardGroup, PageCard } from "@/components/PageCard"
 import { CardDensityToggle } from "@/components/CardDensityToggle"
 import { LoadFailureNotice } from "@/components/LoadFailureNotice"
-import { PageHeader } from "@/components/PageHeader"
+import { ListScreen } from "@/components/layout/ListScreen"
 import { publicPageUrl, type PageSummary } from "@/api/pages"
 import { useCreatePage, useDeletePage, usePages, useUploadPage } from "@/hooks/usePages"
 import { useFolders } from "@/hooks/useFolders"
@@ -135,109 +135,92 @@ export function PagesPage() {
   }
 
   return (
-    <>
-      <PageHeader
-        title="Pages"
-        description="Markdown documents, filed in folders and shared into workspaces"
-        actions={
-          <>
-            <Input
-              size="sm"
-              className="w-56"
-              value={search}
-              placeholder="Search pages…"
-              onChange={(event) => setSearch(event.target.value)}
-            />
-            <CardDensityToggle />
+    <ListScreen
+      title="Pages"
+      description="Markdown documents, filed in folders and shared into workspaces"
+      search={{ value: search, onChange: setSearch, placeholder: "Search pages…" }}
+      extraActions={
+        <>
+          <CardDensityToggle />
 
-            {/* ⚠️ The value is cleared after every pick: choosing the same file twice in a row fires no
-                change event otherwise, and the second upload silently does nothing. */}
-            <input
-              ref={fileInput}
-              type="file"
-              accept=".md,text/markdown"
-              hidden
-              onChange={(event) => {
-                const file = event.target.files?.[0]
+          {/* ⚠️ The value is cleared after every pick: choosing the same file twice in a row fires no
+              change event otherwise, and the second upload silently does nothing. */}
+          <input
+            ref={fileInput}
+            type="file"
+            accept=".md,text/markdown"
+            hidden
+            onChange={(event) => {
+              const file = event.target.files?.[0]
 
-                if (file) {
-                  uploadMarkdown(file)
+              if (file) {
+                uploadMarkdown(file)
+              }
+
+              event.target.value = ""
+            }}
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={uploadPage.isPending}
+            onClick={() => fileInput.current?.click()}
+          >
+            <Upload className="size-3.5" /> Upload .md
+          </Button>
+        </>
+      }
+      action={{ label: "New page", onClick: startPage, disabled: createPage.isPending }}
+      rail={{
+        title: "Folders",
+        items: filterItems,
+        activeKey: activeFolderId,
+        onSelect: setActiveFolderId,
+        allLabel: "All pages",
+        allIcon: "▦",
+        allCount: pages.length,
+      }}
+      failure={failure}
+      onRetry={() => pagesQuery.refetch()}
+      loading={pagesQuery.isLoading}
+      loadingRows={6}
+      isEmpty={visible.length === 0}
+      empty={{
+        title: pages.length === 0 ? "No pages yet" : "Nothing matches",
+        text:
+          pages.length === 0
+            ? "A page is a Markdown document — a note, a procedure, a datasheet with live numbers in it. Write one, or upload a .md file you already have."
+            : "Nothing here matches that search, in this folder.",
+        actions:
+          pages.length === 0 ? [{ label: "New page", primary: true, onClick: startPage }] : [],
+      }}
+    >
+      <div className="flex flex-col gap-5 p-4">
+        {groups.map((group) => (
+          <CardGroup
+            key={group.key}
+            title={group.title}
+            icon={group.icon}
+            count={group.pages.length}
+            hue={hueOfGroup.get(group.key)}
+          >
+            {group.pages.map((page) => (
+              <PageLibraryCard
+                key={page.id}
+                page={page}
+                onOpen={() => openPage(page.id)}
+                onDelete={() =>
+                  deletePage.mutate(page.id, {
+                    onSuccess: () => toast.success(`${page.title} deleted.`),
+                    onError: () => toast.error("Could not delete this page."),
+                  })
                 }
-
-                event.target.value = ""
-              }}
-            />
-            <Button size="sm" variant="outline" disabled={uploadPage.isPending} onClick={() => fileInput.current?.click()}>
-              <Upload className="size-3.5" /> Upload .md
-            </Button>
-            <Button size="sm" disabled={createPage.isPending} onClick={startPage}>
-              New page
-            </Button>
-          </>
-        }
-      />
-
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[15rem_minmax(0,1fr)]">
-        <FilterPanel
-          title="Folders"
-          items={filterItems}
-          activeKey={activeFolderId}
-          onSelect={setActiveFolderId}
-          allLabel="All pages"
-          allIcon="▦"
-          allCount={pages.length}
-        />
-
-        <div className="flex min-w-0 flex-col gap-5">
-          {failure ? (
-            <LoadFailureNotice failure={failure} onRetry={() => pagesQuery.refetch()} />
-          ) : pagesQuery.isLoading ? (
-            <Skeleton className="h-64 w-full" />
-          ) : visible.length === 0 ? (
-            <div className="flex flex-col items-center gap-1.5 rounded-md border border-dashed px-6 py-10 text-center">
-              <span aria-hidden="true" className="text-2xl">
-                📄
-              </span>
-              <span className="text-sm font-medium">{pages.length === 0 ? "No pages yet" : "Nothing matches"}</span>
-              <span className="max-w-md text-xs text-muted-foreground">
-                {pages.length === 0
-                  ? "A page is a Markdown document — a note, a procedure, a datasheet with live numbers in it. Write one, or upload a .md file you already have."
-                  : "Nothing here matches that search, in this folder."}
-              </span>
-              {pages.length === 0 && (
-                <Button size="sm" className="mt-2" disabled={createPage.isPending} onClick={startPage}>
-                  New page
-                </Button>
-              )}
-            </div>
-          ) : (
-            groups.map((group) => (
-              <CardGroup
-                key={group.key}
-                title={group.title}
-                icon={group.icon}
-                count={group.pages.length}
-                hue={hueOfGroup.get(group.key)}
-              >
-                {group.pages.map((page) => (
-                  <PageLibraryCard
-                    key={page.id}
-                    page={page}
-                    onOpen={() => openPage(page.id)}
-                    onDelete={() =>
-                      deletePage.mutate(page.id, {
-                        onSuccess: () => toast.success(`${page.title} deleted.`),
-                        onError: () => toast.error("Could not delete this page."),
-                      })
-                    }
-                  />
-                ))}
-              </CardGroup>
-            ))
-          )}
-        </div>
+              />
+            ))}
+          </CardGroup>
+        ))}
       </div>
-    </>
+    </ListScreen>
   )
 }
 

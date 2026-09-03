@@ -1,4 +1,4 @@
-import type { Directory, FileLibraryPort, ManagedFile } from "@jmouse/files"
+import type { Directory, DirectoryDetail, FileLibraryPort, ManagedFile } from "@jmouse/files"
 import { directoriesApi, fileLinks, fileOwner, filesApi } from "@/api/files"
 
 /**
@@ -26,12 +26,42 @@ import { directoriesApi, fileLinks, fileOwner, filesApi } from "@/api/files"
  * file, and the library knows nothing about it — which is why the token is looked up here rather than
  * expected on the payload the manager holds.
  */
-export function innoventaFileLibrary(tokensByFileId: Map<string, string> = new Map()): FileLibraryPort {
+export function innoventaFileLibrary(
+  tokensByFileId: Map<string, string> = new Map(),
+  /**
+   * Whether this reader may change what a folder accepts.
+   *
+   * ⚠️ **A parameter rather than a check inside the dialog, because the seam IS the permission.** With
+   * no reserved file type anywhere in the library, changing a folder's upload rule is deciding what may
+   * be put into this installation — so it is gated on `directory:policy`, never on the right to rename a
+   * folder. Passing `false` leaves the three members off the port entirely, and the shared manager then
+   * shows no Configuration item at all rather than one that always answers 403.
+   */
+  canConfigure = false,
+): FileLibraryPort {
   function tokenOf(file: ManagedFile): string | null {
     return tokensByFileId.get(file.id) ?? null
   }
 
+  const configuration: Pick<
+    FileLibraryPort,
+    "directoryDetail" | "writeDirectoryConfiguration" | "clearDirectoryConfiguration"
+  > = canConfigure
+    ? {
+        directoryDetail: (directoryId) =>
+          directoriesApi.read(directoryId).then((response) => response.data as DirectoryDetail),
+
+        writeDirectoryConfiguration: (directoryId, kind, document) =>
+          directoriesApi.configure(directoryId, kind, document).then((response) => response.data),
+
+        clearDirectoryConfiguration: (directoryId, kind) =>
+          directoriesApi.clearConfiguration(directoryId, kind).then(() => undefined),
+      }
+    : {}
+
   return {
+    ...configuration,
+
     subtree: (directoryId) =>
       directoriesApi.subtree(directoryId).then((response) => response.data as Directory[]),
 

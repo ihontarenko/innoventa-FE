@@ -6,7 +6,7 @@ import { hasNamedSections, sectionsOf, WIDTH_CLASS, widthOf } from "@/lib/formLa
 import { fieldErrorsOf, withoutHiddenValues, withoutPhantomValues } from "@/lib/formValues"
 import { FieldRow } from "./FieldRow"
 import { VirtualFieldGroup } from "./VirtualFieldGroup"
-import { UploadDestinationProvider, uploadRootFor } from "./UploadDestination"
+import { UploadDestinationProvider, uploadDestinationFor } from "./UploadDestination"
 
 interface DynamicFormProperties {
   form: FormDetail
@@ -103,7 +103,7 @@ export function DynamicForm({
 
       ⚠️ By the form's PURPOSE, never by its id: a workspace has as many inventory forms as it likes.
     */
-    <UploadDestinationProvider rootName={uploadRootFor(form.purpose?.code)}>
+    <UploadDestinationProvider destination={uploadDestinationFor(form)}>
     <form onSubmit={handleSubmit} ref={formRef} className="flex flex-col gap-4">
       {submitError && (
         <Alert variant="destructive">

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState, type ComponentProps } from "react"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 import {
@@ -11,19 +11,19 @@ import {
   DialogHeader,
   DialogTitle,
   type FilterItem,
-  FilterPanel,
   Input,
-  Skeleton,
   Textarea,
+  useKeyboardShortcuts,
+  useListKeyboard,
 } from "@jmouse/ui"
 import { CardGroup, PageCard } from "@/components/PageCard"
-import { PageHeader } from "@/components/PageHeader"
+import { ListScreen } from "@/components/layout/ListScreen"
 import { CardDensityToggle } from "@/components/CardDensityToggle"
 import { groupHues } from "@/lib/groupHues"
-import { Pagination } from "@/components/Pagination"
 import { PlainSelect } from "@/components/access/PolicyEditingKit"
 import { EditorField } from "@/components/form/builder/EditorSection"
 import { useCreateProject, useDeleteProject, useProjects } from "@/hooks/useProjects"
+import { describeQueryFailure } from "@/lib/loadFailure"
 import { relativeTime } from "@/lib/dates"
 import { spaceSectionPath } from "@/lib/navigationContext"
 import { useSpaceStore } from "@/stores/spaceStore"
@@ -67,10 +67,14 @@ export function ProjectsPage() {
   const [activeStatus, setActiveStatus] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
 
-  const { data, isLoading } = useProjects(page, PAGE_SIZE)
+  const projectsQuery = useProjects(page, PAGE_SIZE)
+  const { data, isLoading, refetch } = projectsQuery
+  const failure = describeQueryFailure(projectsQuery, "projects")
   const deleteProject = useDeleteProject()
 
   const projects = useMemo(() => data?.content ?? [], [data])
+
+  const searchBox = useRef<HTMLInputElement>(null)
 
   const visible = useMemo(() => {
     const needle = search.trim().toLowerCase()
@@ -102,98 +106,109 @@ export function ProjectsPage() {
 
   const hueOfGroup = useMemo(() => groupHues(groups.map((group) => group.status.value)), [groups])
 
+  /**
+   * ⚠️ **Keyed over the cards in the order they are DRAWN, not over `visible`.** The cards are grouped
+   * by stage, so the order on screen is the concatenation of the groups; navigating `visible` would
+   * make `j` jump between stages in a sequence that matches nothing anybody can see.
+   */
+  const ordered = useMemo(() => groups.flatMap((group) => group.projects), [groups])
+
+  const keyboard = useListKeyboard<ProjectSummary>({
+    rows: ordered,
+    identify: (project) => project.id,
+    onOpen: (project) => spaceSlug && navigate(spaceSectionPath(spaceSlug, `projects/${project.id}`)),
+  })
+
+  useKeyboardShortcuts([
+    { keys: "/", describes: "Search projects", group: "This list", run: () => searchBox.current?.focus() },
+    { keys: "n", describes: "New project", group: "This list", run: () => setCreating(true) },
+    { keys: "j", describes: "Next project", group: "This list", run: () => keyboard.move(1) },
+    { keys: "k", describes: "Previous project", group: "This list", run: () => keyboard.move(-1) },
+  ])
+
   return (
     <>
-      <PageHeader
+      {/* ⚠️ **Cards here, a table elsewhere, and the shell is the same either way.** A project is one
+          independent object with a coverage figure of its own, which is exactly the case the design
+          rules keep a card for. What the shell fixes is everything AROUND the rows — where the search
+          is, where the stage rail lives, which of the four states shows first. */}
+      <ListScreen
         title="Projects"
         description={`${data?.totalElements ?? 0} being built — and what the shelf covers`}
-        actions={
-          <>
-            <Input
-              className="h-8 w-56 text-sm"
-              value={search}
-              placeholder="Search this page…"
-              onChange={(event) => setSearch(event.target.value)}
-            />
-            <CardDensityToggle />
-            <Button size="sm" onClick={() => setCreating(true)}>
-              New project
-            </Button>
-          </>
+        search={{
+          value: search,
+          onChange: setSearch,
+          placeholder: "Search this page… ( / )",
+          inputRef: searchBox,
+        }}
+        extraActions={<CardDensityToggle />}
+        action={{ label: "New project", onClick: () => setCreating(true) }}
+        rail={{
+          title: "Stage",
+          items: filterItems,
+          activeKey: activeStatus,
+          onSelect: setActiveStatus,
+          allLabel: "Every stage",
+          allIcon: "☰",
+          allCount: projects.length,
+        }}
+        /* ⚠️ The failure is this product's own `LoadFailure`, not `PageState`'s error kind — it tells
+            offline, broken, refused and missing apart, and catches the paused query that stays
+            `pending` with no error and would otherwise read as a skeleton that never stops. */
+        failure={failure}
+        onRetry={() => void refetch()}
+        loading={isLoading}
+        loadingRows={6}
+        isEmpty={visible.length === 0}
+        empty={{
+          title: projects.length === 0 ? "Nothing being built" : "Nothing matches",
+          text: "A project is a bill of materials against what you actually hold — it says how many you could build today, and which line stops you building more.",
+          actions:
+            projects.length === 0
+              ? [{ label: "New project", primary: true, onClick: () => setCreating(true) }]
+              : [],
+        }}
+        pagination={
+          data
+            ? {
+                page,
+                totalPages: data.totalPages,
+                totalElements: data.totalElements,
+                size: data.size,
+                onChange: setPage,
+              }
+            : undefined
         }
-      />
-
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[15rem_minmax(0,1fr)]">
-        <FilterPanel
-          title="Stage"
-          items={filterItems}
-          activeKey={activeStatus}
-          onSelect={setActiveStatus}
-          allLabel="Every stage"
-          allIcon="☰"
-          allCount={projects.length}
-        />
-
-        <div className="flex min-w-0 flex-col gap-5">
-          {isLoading ? (
-            <Skeleton className="h-64 w-full" />
-          ) : visible.length === 0 ? (
-            <div className="flex flex-col items-center gap-1.5 rounded-md border border-dashed px-6 py-10 text-center">
-              <span aria-hidden="true" className="text-2xl">
-                ⚙
-              </span>
-              <span className="text-sm font-medium">
-                {projects.length === 0 ? "Nothing being built" : "Nothing matches"}
-              </span>
-              <span className="max-w-md text-xs text-muted-foreground">
-                A project is a bill of materials against what you actually hold — it says how many you
-                could build today, and which line stops you building more.
-              </span>
-              {projects.length === 0 && (
-                <Button size="sm" className="mt-2" onClick={() => setCreating(true)}>
-                  New project
-                </Button>
-              )}
-            </div>
-          ) : (
-            <>
-              {groups.map((group) => (
-                <CardGroup
-                  key={group.status.value}
-                  title={group.status.label}
-                  icon={group.status.glyph}
-                  count={group.projects.length}
-                  hue={hueOfGroup.get(group.status.value)}
-                >
-                  {group.projects.map((project) => (
-                    <ProjectCard
-                      key={project.id}
-                      project={project}
-                      onOpen={() => spaceSlug && navigate(spaceSectionPath(spaceSlug, `projects/${project.id}`))}
-                      onDelete={() =>
-                        deleteProject.mutate(project.id, {
-                          onSuccess: () => toast.success(`${project.name} deleted.`),
-                          onError: () => toast.error("That project was not deleted."),
-                        })
-                      }
-                    />
-                  ))}
-                </CardGroup>
-              ))}
-
-              {data && data.totalPages > 1 && (
-                <Pagination
-                  page={page}
-                  totalPages={data.totalPages}
-                  totalElements={data.totalElements}
-                  size={data.size}
-                  onChange={setPage}
+      >
+        {/* ⚠️ Cards carry their own padding here because the content block has none — a table fills it
+            edge to edge, and a card pressed against the same edge would read as a broken table. */}
+        <div className="flex flex-col gap-5 p-4">
+          {groups.map((group) => (
+            <CardGroup
+              key={group.status.value}
+              title={group.status.label}
+              icon={group.status.glyph}
+              count={group.projects.length}
+              hue={hueOfGroup.get(group.status.value)}
+            >
+              {group.projects.map((project) => (
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  keyboardProperties={keyboard.rowProperties(project)}
+                  onOpen={() => spaceSlug && navigate(spaceSectionPath(spaceSlug, `projects/${project.id}`))}
+                  onDelete={() =>
+                    deleteProject.mutate(project.id, {
+                      onSuccess: () => toast.success(`${project.name} deleted.`),
+                      onError: () => toast.error("That project was not deleted."),
+                    })
+                  }
                 />
-              )}
-            </>
-          )}
+              ))}
+            </CardGroup>
+          ))}
         </div>
-      </div>
+      </ListScreen>
 
       {creating && (
         <CreateProjectDialog
@@ -213,10 +228,12 @@ export function ProjectsPage() {
 
 function ProjectCard({
   project,
+  keyboardProperties,
   onOpen,
   onDelete,
 }: {
   project: ProjectSummary
+  keyboardProperties?: ComponentProps<typeof PageCard>["navigation"]
   onOpen: () => void
   onDelete: () => void
 }) {
@@ -224,6 +241,7 @@ function ProjectCard({
 
   return (
     <PageCard
+      navigation={keyboardProperties}
       icon={GLYPHS[project.status]}
       panelCount={total > 0 ? `${project.coveredMaterialCount}/${total}` : "no BOM"}
       name={project.name}
@@ -233,6 +251,15 @@ function ProjectCard({
       chips={
         total > 0 ? (
           <>
+            {/* ⚠️ **The run size, because every other figure on this card is read against it.** "Three
+                short" is a footnote on a prototype and a stop on a batch of twenty, and a card that
+                never said which one this was left the reader to guess. */}
+            {project.buildQuantity > 1 && (
+              <Badge variant="outline" className="font-mono">
+                ×{project.buildQuantity}
+              </Badge>
+            )}
+
             {/* ⚠️ Only the counts that are non-zero. A row of three chips reading "0 short, 0 unsourced"
                 is noise on the project that is fine, which is most of them. */}
             {project.shortageMaterialCount > 0 && (
@@ -245,8 +272,14 @@ function ProjectCard({
                 {project.unsourcedMaterialCount} unsourced
               </Badge>
             )}
+            {/* ⚠️ **"Ready" is a claim about the RUN, not about the lines.** The counters behind it are
+                already computed against the build quantity, so a project whose every line is covered can
+                be built as planned — which is the sentence somebody opens this list for, and the one a
+                bare "fully covered" never quite said. */}
             {project.shortageMaterialCount === 0 && project.unsourcedMaterialCount === 0 && (
-              <Badge variant="secondary">fully covered</Badge>
+              <Badge variant="secondary">
+                {project.buildQuantity > 1 ? `ready for ${project.buildQuantity}` : "ready to build"}
+              </Badge>
             )}
           </>
         ) : undefined
@@ -276,6 +309,7 @@ function CreateProjectDialog({
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [status, setStatus] = useState<ProjectStatus>("DESIGN")
+  const [buildQuantity, setBuildQuantity] = useState("1")
 
   return (
     <Dialog open onOpenChange={(next) => !next && onClose()}>
@@ -308,6 +342,20 @@ function CreateProjectDialog({
           </PlainSelect>
         </EditorField>
 
+        {/* ⚠️ **Asked at creation because it changes what every line means.** A bill of materials states
+            quantities per unit; the run size multiplies them, so a project made without one silently
+            reads as a prototype — which is the right default and the wrong assumption to leave unstated.
+            It is changed on the project's own screen afterwards. */}
+        <EditorField label="Building" hint="How many finished units. Every line's requirement is per unit.">
+          <Input
+            type="number"
+            min={1}
+            className="h-8 w-24 text-center font-mono text-sm"
+            value={buildQuantity}
+            onChange={(event) => setBuildQuantity(event.target.value)}
+          />
+        </EditorField>
+
         <EditorField label="Description" hint="What it is, in one line.">
           <Textarea
             rows={2}
@@ -330,6 +378,7 @@ function CreateProjectDialog({
                   description: description.trim() || undefined,
                   status,
                   spaceId: spaceId ?? undefined,
+                  buildQuantity: Math.max(1, Number.parseInt(buildQuantity, 10) || 1),
                 },
                 {
                   onSuccess: (project) => onCreated(project.id),

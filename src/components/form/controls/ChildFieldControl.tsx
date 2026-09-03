@@ -1,4 +1,4 @@
-import { Input, cn } from "@jmouse/ui"
+import { Input, NativeSelect, cn } from "@jmouse/ui"
 import type { FieldSummary } from "@/types"
 
 /**
@@ -41,11 +41,11 @@ export function ChildFieldControl({
 
   if ((child.elementType === "SELECT" || child.elementType === "RADIO") && options.length > 0) {
     return (
-      <select
+      <NativeSelect
         aria-label={child.label}
         title={child.label}
         className={cn(
-          "h-9 w-full min-w-0 truncate rounded-md border bg-transparent px-2 text-sm shadow-xs",
+          "w-full truncate",
           hasError && "border-destructive",
         )}
         value={value}
@@ -57,7 +57,7 @@ export function ChildFieldControl({
             {option.optionLabel}
           </option>
         ))}
-      </select>
+      </NativeSelect>
     )
   }
 

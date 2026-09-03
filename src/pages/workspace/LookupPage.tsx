@@ -2,15 +2,16 @@ import { useState } from "react"
 import { toast } from "sonner"
 import { Button, Input, Skeleton } from "@jmouse/ui"
 import { PageHeader } from "@/components/PageHeader"
+import { SearchModes } from "@/components/search/SearchModes"
 import { ToggleChip } from "@/components/ToggleChip"
 import { Callout } from "@/components/Callout"
 import { EntryDetailDrawer } from "@/components/form/EntryDetailDrawer"
 import { AddFromLookupDialog } from "@/components/lookup/AddFromLookupDialog"
 import { OfferCard } from "@/components/lookup/OfferCard"
 import { OfferDetailSheet } from "@/components/lookup/OfferDetailSheet"
-import { usePricingSearch } from "@/hooks/usePricing"
+import { useLookupSearch } from "@/hooks/useLookup"
 import { useCreateEntry } from "@/hooks/useWorkspaceForms"
-import type { PricingOffer } from "@/api/pricing"
+import type { LookupOffer } from "@/api/lookup"
 import type { FormEntry } from "@/types"
 
 /**
@@ -41,11 +42,11 @@ export function LookupPage() {
   const [typed, setTyped] = useState("")
   const [query, setQuery] = useState("")
 
-  const [detail, setDetail] = useState<PricingOffer | null>(null)
-  const [adding, setAdding] = useState<PricingOffer | null>(null)
+  const [detail, setDetail] = useState<LookupOffer | null>(null)
+  const [adding, setAdding] = useState<LookupOffer | null>(null)
   const [prefilled, setPrefilled] = useState<{ formId: string; values: Record<string, string> } | null>(null)
 
-  const { data, isFetching, isError, error } = usePricingSearch(provider, query, query.length > 0)
+  const { data, isFetching, isError, error } = useLookupSearch(provider, query, query.length > 0)
   const createEntry = useCreateEntry()
 
   const detailMessage = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
@@ -92,6 +93,8 @@ export function LookupPage() {
           </>
         }
       />
+
+      <SearchModes />
 
       <div className="flex min-w-0 flex-col gap-3">
         {isError && (

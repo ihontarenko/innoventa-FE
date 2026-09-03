@@ -27,7 +27,7 @@ import type { ManagedForm } from "./types"
  * | Depth | Where | Configuration shown |
  * |---|---|---|
  * | `base` | the **form library**, the **schema builder**, and a form's own manage page | the `form`-scoped groups only: what an entry is called, what the button says, how a value is validated — plus the widgets it carries, which are the form engine's own |
- * | `domain` | **component types**, and any other screen a subject area contributes | the above **plus** that area's own groups (`stock.*`, `pricing.*`) and, for an asset form, its metrics and plans |
+ * | `domain` | **component types**, and any other screen a subject area contributes | the above **plus** that area's own groups (`stock.*`, `catalogue.*`) and, for an asset form, its metrics and plans |
  *
  * ⚠️ **The BUILDER is `base`, and getting that wrong is the bug this table exists to prevent** (Ivan,
  * 2026-08-25: *«форм лібрарі не має знати ні про які прайси. це порушення рівнів»*). It is tempting to
@@ -36,7 +36,7 @@ import type { ManagedForm } from "./types"
  * or distributors. **The level belongs to the screen you came from, never to how much detail is
  * available.**
  *
- * ⚠️ So `stock.*` and `pricing.*` are editable in exactly one place: the Component types screen, which
+ * ⚠️ So `stock.*` and `catalogue.*` are editable in exactly one place: the Component types screen, which
  * is the level that owns them. Ivan: *«form library low level < component types highest level over form
  * library»*.
  */
@@ -211,7 +211,7 @@ const GROUP_GLYPHS: Record<string, string> = {
   Submitting: "⌸",
   Validation: "✓",
   Stock: "📦",
-  Pricing: "₴",
+  Catalogue: "🗂",
 }
 
 interface RailItem {

@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/PageHeader"
 import { Pagination } from "@/components/Pagination"
 import { ToggleChip } from "@/components/ToggleChip"
 import { ViewBar } from "@/components/ViewBar"
-import { AssetDrawer } from "@/components/custody/AssetDrawer"
+import { AssetSheet } from "@/components/custody/AssetPanel"
 import { LoadFailureNotice } from "@/components/LoadFailureNotice"
 import { useAssetForms } from "@/hooks/useCustody"
 import { useInspectionBoard, useMonitoringModule } from "@/hooks/useMonitoring"
@@ -160,7 +160,7 @@ export function InspectionsPage() {
         </div>
       )}
 
-      {openAssetId && <AssetDrawer assetId={openAssetId} onClose={() => setOpenAssetId(null)} />}
+      {openAssetId && <AssetSheet assetId={openAssetId} onClose={() => setOpenAssetId(null)} />}
     </>
   )
 }

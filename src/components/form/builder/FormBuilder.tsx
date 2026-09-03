@@ -1,18 +1,25 @@
-import { useState } from "react"
-import { Link, useParams } from "react-router-dom"
-import { ExternalLink, Eye, SlidersHorizontal } from "lucide-react"
+import { useState }                                                                      from "react"
+import { Link, useParams }                                                               from "react-router-dom"
+import { ExternalLink, Eye, ShieldCheck, SlidersHorizontal }                             from "lucide-react"
 import { Badge, Button, Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@jmouse/ui"
-import type { FieldSummary, FormDetail } from "@/types"
-import { PageHeader } from "@/components/PageHeader"
-import { FormManagementDialog } from "@/components/form/FormManagementDialog"
-import { FormPreviewDialog } from "@/components/form/FormPreviewDialog"
-import { spaceSectionPath } from "@/lib/navigationContext"
-import { useAttachField } from "@/hooks/useForms"
-import { useIsWideLayout } from "@/hooks/useMediaQuery"
-import { ChildPickerDialog } from "./ChildPickerDialog"
-import { FieldEditor } from "./FieldEditor"
-import { FieldPickerDialog } from "./FieldPickerDialog"
-import { FormCanvas } from "./FormCanvas"
+import type { FieldSummary, FormDetail }                                                 from "@/types"
+import { PageHeader }                                                                    from "@/components/PageHeader"
+import {
+    FormManagementDialog
+}                                                                                        from "@/components/form/FormManagementDialog"
+import {
+    FormPreviewDialog
+}                                                                                        from "@/components/form/FormPreviewDialog"
+import {
+    FormValidationDialog
+}                                                                                        from "@/components/form/FormValidationDialog"
+import { spaceSectionPath }                                                              from "@/lib/navigationContext"
+import { useAttachField }                                                                from "@/hooks/useForms"
+import { useIsWideLayout }                                                               from "@/hooks/useMediaQuery"
+import { ChildPickerDialog }                                                             from "./ChildPickerDialog"
+import { FieldEditor }                                                                   from "./FieldEditor"
+import { FieldPickerDialog }                                                             from "./FieldPickerDialog"
+import { FormCanvas }                                                                    from "./FormCanvas"
 
 /**
  * Building a form: the questions it asks, in order, each opening where it stands.
@@ -41,6 +48,7 @@ export function FormBuilder({ form }: { form: FormDetail }) {
   const [isPickingChild, setPickingChild] = useState(false)
   const [isPreviewOpen, setPreviewOpen] = useState(false)
   const [isManaging, setManaging] = useState(false)
+  const [isValidating, setValidating] = useState(false)
   const isWide = useIsWideLayout()
 
   const attachField = useAttachField(form.id)
@@ -77,6 +85,10 @@ export function FormBuilder({ form }: { form: FormDetail }) {
             <Button variant="ghost" size="sm" onClick={() => setPreviewOpen(true)}>
               <Eye className="size-3.5" />
               Preview
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setValidating(true)}>
+              <ShieldCheck className="size-3.5" />
+              Validation
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setManaging(true)}>
               <SlidersHorizontal className="size-3.5" />
@@ -153,8 +165,13 @@ export function FormBuilder({ form }: { form: FormDetail }) {
       {/* ⚠️ **`base`, and this is the levels rule, not an oversight** (Ivan, 2026-08-25). The builder is
           reached from the form library, which is the platform's base and knows nothing about stock or
           distributors — so no subject-area configuration appears here however much detail is to hand.
-          `stock.*` and `pricing.*` are edited on Component types, the level that owns them. */}
+          `stock.*` and `catalogue.*` are edited on Component types, the level that owns them. */}
       {isManaging && <FormManagementDialog form={form} onClose={() => setManaging(false)} />}
+
+      {/* ⚠️ The document is about the FORM, so it is edited from the form and nowhere else. A field's
+          own rules travel with the field — `quantity` carries one for forty-four forms — and this
+          window deliberately cannot reach them. */}
+      <FormValidationDialog form={form} open={isValidating} onOpenChange={setValidating} />
     </>
   )
 }

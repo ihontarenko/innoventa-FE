@@ -91,6 +91,16 @@ export const HAS_UNIT = new Set<ElementType>(["NUMBER", "RANGE", "SIMPLE_COMPOSI
 export const HAS_PLACEHOLDER = new Set<ElementType>(["TEXT", "TEXTAREA", "EMAIL", "URL", "NUMBER", "SELECT"])
 
 /**
+ * The types whose value may turn out to be a picture, and so may be framed on its way in.
+ *
+ * ⚠️ **`FILE` is in here and that is not a slip.** One control serves both, and whether a crop is
+ * offered is decided per *upload* rather than per field — a `FILE` that receives a photograph gets the
+ * same offer, and the same one receiving a PDF gets none. Leaving `FILE` out would hide the settings
+ * from exactly the fields people attach screenshots to.
+ */
+export const HAS_PICTURE = new Set<ElementType>(["IMAGE", "FILE"])
+
+/**
  * Where a field may stand — the **one** list, carrying its own glyph.
  *
  * ⚠️ **There were three of these and they had already disagreed.** This one, the Fields screen's, and

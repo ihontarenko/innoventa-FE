@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { Badge, Skeleton, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@jmouse/ui"
+import { Badge, NativeSelect, Skeleton, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@jmouse/ui"
 import type { AccessHolderView } from "@/api/access"
 import { useAccessWhat } from "@/hooks/useAccess"
 import { useAdminPermissions } from "@/hooks/useAdministration"
@@ -27,9 +27,9 @@ export function WhatPanel() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <select
+        <NativeSelect
           aria-label="Permission"
-          className="h-9 min-w-72 rounded-md border bg-transparent px-2 font-mono text-sm shadow-xs"
+          className="min-w-72 font-mono"
           value={permission}
           onChange={(event) => setPermission(event.target.value)}
         >
@@ -43,7 +43,7 @@ export function WhatPanel() {
               ))}
             </optgroup>
           ))}
-        </select>
+        </NativeSelect>
         <Badge variant="outline">{catalogue.length} declared</Badge>
       </div>
 

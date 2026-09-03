@@ -36,14 +36,25 @@ export interface EntryLocation {
 export interface LocationItem {
   entryId: string
   label: string
+  /** ⚠️ The form's **id** — a record is addressed by its form and its id, and a link built from the name resolves to nothing. */
+  formId: string
   formName: string
+  /** Where exactly, when the listing reached into nested places. ⚠️ Absent for an item sitting right here. */
+  location?: string | null
 }
 
 export const storageLocationsApi = {
   tree: () => http.get<StorageLocation[]>("/storage-locations"),
 
-  /** ⚠️ Directly here only — a drawer's contents are not a cabinet's. */
-  contents: (locationId: string) => http.get<LocationItem[]>(`/storage-locations/${locationId}/items`),
+  /**
+   * What is filed here — and, with `deep`, in everything inside it too.
+   *
+   * ⚠️ **Two different questions, and the default is the narrow one.** Asking a cabinet and being shown
+   * its drawers is usually what somebody means; it is also what turns "this place is empty" into a
+   * wrong conclusion the other way.
+   */
+  contents: (locationId: string, deep = false) =>
+    http.get<LocationItem[]>(`/storage-locations/${locationId}/items`, { params: { deep } }),
 
   create: (payload: {
     name: string
@@ -67,10 +78,10 @@ export const storageLocationsApi = {
   delete: (locationId: string) => http.delete<void>(`/storage-locations/${locationId}`),
 
   /** ⚠️ `null` is an answer — the thing exists and is nowhere in particular. */
-  whereIs: (entryId: string) => http.get<EntryLocation | null>(`/storage-locations/entry/${entryId}`),
+  whereIs: (entryId: string) => http.get<EntryLocation | null>(`/storage-locations/entries/${entryId}`),
 
   assign: (entryId: string, locationId: string) =>
-    http.put<EntryLocation>(`/storage-locations/entry/${entryId}`, { locationId }),
+    http.put<EntryLocation>(`/storage-locations/entries/${entryId}`, { locationId }),
 
-  unassign: (entryId: string) => http.delete<void>(`/storage-locations/entry/${entryId}`),
+  unassign: (entryId: string) => http.delete<void>(`/storage-locations/entries/${entryId}`),
 }

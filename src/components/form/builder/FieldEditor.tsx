@@ -1,12 +1,13 @@
 import { useEffect, type ReactNode } from "react"
 import { Button, Input, Skeleton, Switch, cn } from "@jmouse/ui"
 import type { FieldCondition, FormDetail } from "@/types"
-import { HAS_OPTIONS } from "@/lib/fieldTypes"
+import { HAS_OPTIONS, HAS_PICTURE } from "@/lib/fieldTypes"
 import { useField } from "@/hooks/useForms"
 import { AdvancedSection } from "./sections/AdvancedSection"
 import { ChoicesSection } from "./sections/ChoicesSection"
 import { CompositionSection } from "./sections/CompositionSection"
 import { ConditionSection } from "./sections/ConditionSection"
+import { PictureSection } from "./sections/PictureSection"
 import { ShapeSection } from "./sections/ShapeSection"
 import { ValidationSection } from "./sections/ValidationSection"
 import { FieldPreviewCard } from "./FieldPreviewCard"
@@ -160,7 +161,23 @@ function LoadedFieldEditor({
           putting them behind a heading of their own was the one thing every visit had to open first. */}
       {/* ⚠️ `pr-10` in the sheet, and only there: its own close button is positioned over this corner,
           and without the inset it lands on top of the Required switch. */}
-      <div className={cn("flex flex-col gap-2 border-b bg-muted/30 px-3 py-2.5", variant === "panel" && "pr-10")}>
+      {/* ⚠️ **The tint and the rule belong to a container, and the page has none.** In the sheet and in
+          an expanded catalogue row this strip is the header of a bordered box, so a fill and a bottom
+          rule read as *the top of that box*. On the page there is no box: the same fill becomes a band
+          running the full width of the screen, with its own left inset that agrees with nothing, and a
+          rule cutting across a page nothing else divides. So on a page it is plain, and its padding is
+          the grid's own — the label lines up with the cards' left edge, and the space beneath it is the
+          same `gap-3` the cards keep between themselves. */}
+      <div
+        className={cn(
+          "flex flex-col gap-2 px-3",
+          // ⚠️ No top padding on a page: the page's own content inset already put this below the
+          // header's rule, and a second one on top of it opened a gap three times the `gap-3` every
+          // card below keeps — the one space on the screen that answered to nothing.
+          variant === "page" ? "pt-0" : "border-b bg-muted/30 py-2.5",
+          variant === "panel" && "pr-10",
+        )}
+      >
         <div className="flex items-center gap-2">
           <Input
             aria-label="Icon"
@@ -206,7 +223,26 @@ function LoadedFieldEditor({
 
       <div className={cn("min-h-0", variant === "panel" && "flex-1 overflow-y-auto")}>
         <div className={cn("grid items-start gap-3 p-3", isTiled && "md:grid-cols-2")}>
-          <FieldPreviewCard detail={detail} draft={draft} />
+          {/*
+            ⚠️ **Preview and Picture are ONE cell, stacked — half the width, like everything beside
+            them.** Both are about the picture this field takes, so *Picture* belongs under the preview
+            rather than anywhere else; and being a cell rather than a full-width band is what keeps it
+            the same size as the cards it sits among (Ivan, on a full-width attempt: *«я цього не
+            просив… на великих блоках блок налаштувань картинки має бути у пів ширини як і інші і
+            відображатись під іншим»*).
+
+            ⚠️ **The stack is also what closes the hole.** A grid row is as tall as its tallest cell and
+            *Shape* is a wall of type chips, so a lone preview beside it left a screenful of nothing
+            underneath. The short card fills the space the tall one makes.
+
+            ⚠️ **And it adapts by itself.** Below `md` the grid is one column, so the two simply follow
+            each other down the page in the same order — no second rule to keep in step with this one.
+          */}
+          <div className="flex flex-col gap-3">
+            <FieldPreviewCard detail={detail} draft={draft} />
+
+            {HAS_PICTURE.has(draft.elementType) && <PictureSection editor={editor} />}
+          </div>
 
           <ShapeSection editor={editor} />
 

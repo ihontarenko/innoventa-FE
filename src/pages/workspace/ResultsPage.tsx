@@ -1,12 +1,10 @@
 import { useMemo, useState } from "react"
-import { useSearchParams } from "react-router-dom"
 import { toast } from "sonner"
-import { Badge, Button, type FilterItem, FilterPanel, Input, Skeleton, cn } from "@jmouse/ui"
-import { PageHeader } from "@/components/PageHeader"
-import { Pagination } from "@/components/Pagination"
+import { Badge, Button, type FilterItem, cn } from "@jmouse/ui"
+import { ListScreen } from "@/components/layout/ListScreen"
+import { DataTable } from "@/components/layout/DataTable"
 import { SegmentedControl } from "@/components/SegmentedControl"
-import { ToggleChip } from "@/components/ToggleChip"
-import { QueryPanel, type AppliedQuery } from "@jmouse/query"
+import { QueryPanel } from "@jmouse/query"
 import { entriesOf } from "@/components/query/subjects"
 import { QUERY_LABELS } from "@/components/query/labels"
 import { EntryDetailDrawer } from "@/components/form/EntryDetailDrawer"
@@ -20,6 +18,7 @@ import {
 } from "@/hooks/useWorkspaceForms"
 import { useForm } from "@/hooks/useForms"
 import { useSpaces } from "@/hooks/useSpaces"
+import { useAddress } from "@/hooks/useAddress"
 import { relativeTime, readableMoment } from "@/lib/dates"
 import { spaceSectionPath } from "@/lib/navigationContext"
 import { useSpaceStore } from "@/stores/spaceStore"
@@ -51,12 +50,14 @@ export function ResultsPage() {
    * a stream but useless from a form card: there was no way at all from "Contact Us" to "the Contact Us
    * submissions". The address answers it, so the link is shareable and Back goes where somebody expects.
    */
-  const [parameters, setParameters] = useSearchParams()
+  const { parameters, amend, query: jmq, setQuery: setJmq } = useAddress()
   const formId = parameters.get("form")
 
   // ⚠️ A way back out. Narrowed to one form with nothing saying so, and no control to clear it, the
   // screen would look like a purpose that had lost most of its rows.
-  const showEveryForm = () => setParameters({}, { replace: true })
+  // ⚠️ The filter goes with it: it is written against the form's own vocabulary and means nothing once
+  // the screen is back to spanning a purpose.
+  const showEveryForm = () => amend({ form: null, "jmq:filter": null, "jmq:order": null, page: null })
 
   const { data: purposes = [] } = usePurposes()
   const { data: spaces = [] } = useSpaces()
@@ -68,7 +69,6 @@ export function ResultsPage() {
   const [page, setPage] = useState(0)
   const [search, setSearch] = useState("")
   const [openEntry, setOpenEntry] = useState<FormEntry | null>(null)
-  const [jmq, setJmq] = useState<AppliedQuery>({})
   const [composing, setComposing] = useState(false)
 
   // With no workspace to stand in there is nothing to scope to, and the control would be a lie.
@@ -112,7 +112,7 @@ export function ResultsPage() {
     setOpenEntry(null)
     // ⚠️ Picking a purpose leaves the one-form view. Narrowed to a form AND highlighting a purpose, the
     // panel would claim a filter that is not in force.
-    setParameters({}, { replace: true })
+    amend({ form: null, "jmq:filter": null, "jmq:order": null })
   }
 
   const total = resultsPage?.totalElements ?? 0
@@ -127,8 +127,8 @@ export function ResultsPage() {
 
   return (
     <>
-      <PageHeader
-        title={formId ? formName ?? "Submissions" : "Submissions"}
+      <ListScreen
+        title={formId ? (formName ?? "Submissions") : "Submissions"}
         description={
           formId
             ? `${total} submitted against this form`
@@ -136,45 +136,41 @@ export function ResultsPage() {
               ? `${total} submitted in this workspace`
               : `${total} everywhere — including public forms that belong to no workspace`
         }
-        actions={
+        search={{ value: search, onChange: setSearch, placeholder: "Search every submission…" }}
+        chips={[
+          // ⚠️ Offered only on the one-form view — see the hook above for why.
+          ...(formId
+            ? [{ label: "Filter", active: composing, onClick: () => setComposing((previous) => !previous) }]
+            : []),
+          {
+            label: (
+              <span className="flex items-center gap-1.5">
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "size-1.5 rounded-full",
+                    isLive
+                      ? isRefetching
+                        ? "bg-current"
+                        : "animate-pulse bg-current"
+                      : "bg-muted-foreground",
+                  )}
+                />
+                {isLive ? "Live" : "Not live"}
+              </span>
+            ),
+            active: isLive,
+            title: isLive ? "Stop re-asking" : `Re-ask every ${LIVE_INTERVAL_MILLISECONDS / 1000} seconds`,
+            onClick: () => setLive((previous) => !previous),
+          },
+        ]}
+        extraActions={
           <>
             {formId && (
               <Button size="sm" variant="outline" onClick={showEveryForm}>
                 Every form
               </Button>
             )}
-
-            {/* ⚠️ Offered only on the one-form view — see the hook above for why. */}
-            {formId && (
-              <ToggleChip active={composing} onClick={() => setComposing((previous) => !previous)}>
-                Filter
-              </ToggleChip>
-            )}
-
-            <Input
-              size="sm"
-              className="w-56"
-              value={search}
-              placeholder="Search every submission…"
-              onChange={(event) => setSearch(event.target.value)}
-            />
-
-            <ToggleChip
-              active={isLive}
-              title={isLive ? "Stop re-asking" : `Re-ask every ${LIVE_INTERVAL_MILLISECONDS / 1000} seconds`}
-              onClick={() => setLive((previous) => !previous)}
-            >
-              <span className="flex items-center gap-1.5">
-                <span
-                  aria-hidden="true"
-                  className={cn(
-                    "size-1.5 rounded-full",
-                    isLive ? (isRefetching ? "bg-current" : "animate-pulse bg-current") : "bg-muted-foreground",
-                  )}
-                />
-                {isLive ? "Live" : "Not live"}
-              </span>
-            </ToggleChip>
 
             {activeSpaceId && (
               <SegmentedControl
@@ -205,121 +201,108 @@ export function ResultsPage() {
             />
           </>
         }
-      />
-
-      {/*
-        ⚠️ Below the header rather than in a drawer: a filter somebody is composing and the rows it will
-        narrow belong on one screen. A panel that covered the list would make every adjustment a guess.
-      */}
-      {formId && composing && (
-        <QueryPanel
-          subject={entriesOf(formId)}
-          query={jmq}
-          labels={QUERY_LABELS}
-          placeholder="entry[component_name] is contains('кос') and entry[quantity] | int < 5"
-          onApply={(applied) => {
-            setJmq(applied)
-            setPage(0)
-          }}
-        />
-      )}
-
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[15rem_minmax(0,1fr)]">
-        <FilterPanel
-          title="Purposes"
-          items={filterItems}
-          activeKey={formId ? null : (activeCode ?? null)}
-          onSelect={choosePurpose}
-          allLabel="Every purpose"
-          allIcon="☰"
-          searchable={filterItems.length > 8}
-        />
-
-        <div className="flex min-w-0 flex-col gap-3">
-          {isLoading ? (
-            <Skeleton className="h-64 w-full" />
-          ) : entries.length === 0 ? (
-            <div className="flex flex-col items-center gap-1.5 rounded-md border border-dashed px-6 py-10 text-center">
-              <span aria-hidden="true" className="text-2xl">
-                ◔
-              </span>
-              <span className="text-sm font-medium">Nothing here</span>
-              <span className="max-w-md text-xs text-muted-foreground">
-                {effectivelyScoped
-                  ? "Nothing has been submitted in this workspace. Public submissions belong to no workspace at all — look everywhere."
-                  : everybody
-                    ? "Nothing has been submitted under this purpose."
-                    : "You have not submitted anything under this purpose."}
-              </span>
-              {effectivelyScoped && (
-                <Button variant="outline" size="sm" className="mt-2" onClick={() => setScopedToWorkspace(false)}>
-                  Look everywhere
-                </Button>
-              )}
+        /* ⚠️ Below the header rather than in a drawer: a filter somebody is composing and the rows it
+            will narrow belong on one screen. A panel that covered the list would make every adjustment
+            a guess. */
+        banner={
+          formId && composing ? (
+            <div className="shrink-0 border-b">
+              <QueryPanel
+                subject={entriesOf(formId)}
+                query={jmq}
+                labels={QUERY_LABELS}
+                placeholder="entry[component_name] is contains('кос') and entry[quantity] | int < 5"
+                onApply={(applied) => {
+                  setJmq(applied)
+                  setPage(0)
+                }}
+              />
             </div>
-          ) : (
-            <div className="flex flex-col overflow-hidden rounded-md border">
-              <div className="min-w-0 overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/40 text-[10px] tracking-[0.06em] text-muted-foreground uppercase">
-                      <th className="w-36 px-2.5 py-1.5 text-left font-medium">Submitted</th>
-                      <th className="w-56 px-2.5 py-1.5 text-left font-medium">Form</th>
-                      {everybody && <th className="w-52 px-2.5 py-1.5 text-left font-medium">By</th>}
-                      <th className="px-2.5 py-1.5 text-left font-medium">What it said</th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {entries.map((entry) => (
-                      <tr
-                        key={entry.id}
-                        onClick={() => setOpenEntry(entry)}
-                        className={cn(
-                          "cursor-pointer border-b transition-colors last:border-b-0 hover:bg-accent",
-                          openEntry?.id === entry.id && "bg-accent",
-                        )}
-                      >
-                        <td className="px-2.5 py-1.5" title={readableMoment(entry.createdAt)}>
-                          <span className="block text-xs">{relativeTime(entry.createdAt)}</span>
-                          <span className="block font-mono text-[10px] text-muted-foreground">
-                            {new Date(entry.createdAt).toLocaleDateString()}
-                          </span>
-                        </td>
-
-                        <td className="px-2.5 py-1.5">
-                          <span className="block truncate text-xs font-medium">{entry.formName}</span>
-                          <WhereItLanded spaceId={entry.spaceId} spaceNames={spaceNames} />
-                        </td>
-
-                        {everybody && (
-                          <td className="max-w-52 truncate px-2.5 py-1.5 text-xs">
-                            {entry.submitterEmail ?? <span className="text-muted-foreground">Anonymous</span>}
-                          </td>
-                        )}
-
-                        <td className="px-2.5 py-1.5">
-                          <Preview fieldValues={entry.fieldValues} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {resultsPage && resultsPage.totalPages > 1 && (
-                <Pagination
-                  page={page}
-                  totalPages={resultsPage.totalPages}
-                  totalElements={resultsPage.totalElements}
-                  size={resultsPage.size}
-                  onChange={setPage}
-                />
-              )}
-            </div>
-          )}
-        </div>
-      </div>
+          ) : undefined
+        }
+        rail={{
+          title: "Purposes",
+          items: filterItems,
+          activeKey: formId ? null : (activeCode ?? null),
+          onSelect: choosePurpose,
+          allLabel: "Every purpose",
+          allIcon: "☰",
+          searchable: filterItems.length > 8,
+        }}
+        loading={isLoading}
+        isEmpty={entries.length === 0}
+        empty={{
+          title: "Nothing here",
+          text: effectivelyScoped
+            ? "Nothing has been submitted in this workspace. Public submissions belong to no workspace at all — look everywhere."
+            : everybody
+              ? "Nothing has been submitted under this purpose."
+              : "You have not submitted anything under this purpose.",
+          actions: effectivelyScoped
+            ? [{ label: "Look everywhere", onClick: () => setScopedToWorkspace(false) }]
+            : [],
+        }}
+        pagination={
+          resultsPage
+            ? {
+                page,
+                totalPages: resultsPage.totalPages,
+                totalElements: resultsPage.totalElements,
+                size: resultsPage.size,
+                onChange: setPage,
+              }
+            : undefined
+        }
+      >
+        <DataTable
+          rows={entries}
+          rowKey={(entry) => entry.id}
+          onRowClick={(entry) => setOpenEntry(entry)}
+          rowClassName={(entry) => (openEntry?.id === entry.id ? "bg-accent" : undefined)}
+          columns={[
+            {
+              key: "submitted",
+              header: "Submitted",
+              className: "w-36",
+              cell: (entry) => (
+                <span title={readableMoment(entry.createdAt)}>
+                  <span className="block text-xs">{relativeTime(entry.createdAt)}</span>
+                  <span className="text-muted-foreground block font-mono text-[10px]">
+                    {new Date(entry.createdAt).toLocaleDateString()}
+                  </span>
+                </span>
+              ),
+            },
+            {
+              key: "form",
+              header: "Form",
+              className: "w-56",
+              cell: (entry) => (
+                <>
+                  <span className="block truncate text-xs font-medium">{entry.formName}</span>
+                  <WhereItLanded spaceId={entry.spaceId} spaceNames={spaceNames} />
+                </>
+              ),
+            },
+            ...(everybody
+              ? [
+                  {
+                    key: "by",
+                    header: "By",
+                    className: "max-w-52 truncate text-xs",
+                    cell: (entry: FormEntry) =>
+                      entry.submitterEmail ?? <span className="text-muted-foreground">Anonymous</span>,
+                  },
+                ]
+              : []),
+            {
+              key: "said",
+              header: "What it said",
+              cell: (entry) => <Preview fieldValues={entry.fieldValues} />,
+            },
+          ]}
+        />
+      </ListScreen>
 
       {openEntry && (
         <EntryDetailDrawer

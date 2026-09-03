@@ -118,8 +118,12 @@ export const filesApi = {
    * after. It is asked when something is about to be filed, never on sign-in: provisioning every root
    * for every account would make folders for people who will never upload a footprint.
    */
-  folder: (name: string) =>
-    platformHttp.get<{ id: string; path: string }>(`/file-folders/${name}`),
+  folder: (name: string, shelves?: { type?: string; kind?: string }) =>
+    platformHttp.get<{ id: string; path: string }>(`/files/folders/${name}`, {
+      /* ⚠️ Named parameters, not a path. The ROOT stays allow-listed on the server; these two are the
+         shelves inside it, sanitised and capped there — see `FileDirectories.namedFolderOf`. */
+      params: { type: shelves?.type || undefined, kind: shelves?.kind || undefined },
+    }),
 
   /**
    * The bytes themselves, for anything that has to draw them.
@@ -188,6 +192,25 @@ export interface Directory {
 }
 
 /**
+ * A folder with everything that applies to it, keyed by configuration kind.
+ *
+ * ⚠️ **Keyed by kind, not flattened into `uploadMode` / `uploadExtensions`.** The backend's table takes
+ * any kind of directory configuration — a retention window, a naming strategy — and a shape named after
+ * `upload` would have to be redesigned the day a second one arrives.
+ */
+export interface DirectoryDetail extends Directory {
+  configurations: Record<
+    string,
+    {
+      effective: unknown
+      origin: "SELF" | "INHERITED" | "INSTALLATION"
+      originPath: string | null
+      own: boolean
+    }
+  >
+}
+
+/**
  * ⚠️ **There is no "list the roots" call, and asking for one is the trap.** `GET /directories` answers
  * for an owner and a cabinet's root is not filed under anything, so it comes back empty however it is
  * asked. The way in is the profile: `filesRootId` names this account's own root, and `subtree` reads
@@ -195,6 +218,33 @@ export interface Directory {
  */
 export const directoriesApi = {
   subtree: (directoryId: string) => http.get<Directory[]>(`/directories/${directoryId}/subtree`),
+
+  /**
+   * One folder, with the rules that actually apply to it.
+   *
+   * ⚠️ **A separate call from `subtree`, and it has to be.** Resolving a folder's effective rule walks
+   * its ancestors, so answering it for every row of a tree would turn drawing the sidebar into a resolve
+   * per node. `subtree` answers with `configurations` empty; this one answers whole.
+   */
+  read: (directoryId: string) => http.get<DirectoryDetail>(`/directories/${directoryId}`),
+
+  /**
+   * Say what a folder accepts.
+   *
+   * ⚠️ **Gated on `directory:policy`, not `directory:write`.** With no reserved file type anywhere in the
+   * library, this is the right to decide what may be put into this installation — it is deliberately not
+   * the right to rename a folder, and an account holding only the second gets a `403` here.
+   *
+   * ⚠️ **Read the answer rather than the request.** The backend normalises what arrives — lower-cases,
+   * strips a leading dot, drops content-type parameters — and a screen showing what was typed hides the
+   * difference until somebody's next upload fails.
+   */
+  configure: (directoryId: string, kind: string, document: unknown) =>
+    http.put<unknown>(`/directories/${directoryId}/configurations/${kind}`, document),
+
+  /** Clear it, returning the folder to inheriting. ⚠️ Genuinely NO ROW, not an empty one. */
+  clearConfiguration: (directoryId: string, kind: string) =>
+    http.delete(`/directories/${directoryId}/configurations/${kind}`),
 
   create: (parentId: string, name: string) =>
     http.post<Directory>("/directories", { name }, { params: { parentId } }),
@@ -229,12 +279,12 @@ export const directoriesApi = {
  */
 export const shareApi = {
   tokens: (entityType: string, ids: string[]) =>
-    platformHttp.get<Record<string, string>>("/share/tokens", { params: { entityType, ids } }),
+    platformHttp.get<Record<string, string>>("/shares/tokens", { params: { entityType, ids } }),
 
   rotate: (entityType: string, entityId: string) =>
-    platformHttp.post<{ token: string }>(`/share/${entityType}/${entityId}/rotate`),
+    platformHttp.post<{ token: string }>(`/shares/${entityType}/${entityId}/rotate`),
 
-  revoke: (entityType: string, entityId: string) => platformHttp.delete(`/share/${entityType}/${entityId}`),
+  revoke: (entityType: string, entityId: string) => platformHttp.delete(`/shares/${entityType}/${entityId}`),
 }
 
 // ⚠️ The installation's public settings used to be a second `configApi` here, over the same `/config`

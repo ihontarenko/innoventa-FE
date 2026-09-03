@@ -238,7 +238,7 @@ function BomBlock({ bom }: { bom: Bom }) {
                 <td className="py-1 pr-2">{line.componentDescription}</td>
                 <td className="py-1 pr-2 text-right font-mono">{line.quantityRequired}</td>
                 {/* ⚠️ `?` rather than 0 — a material nobody has counted is not a material with none. */}
-                <td className="py-1 text-right font-mono">{line.stockQuantityCached ?? "?"}</td>
+                <td className="py-1 text-right font-mono">{line.heldQuantity ?? "?"}</td>
               </tr>
             ))}
           </tbody>

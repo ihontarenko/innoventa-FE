@@ -1,3 +1,4 @@
+import { ProjectFilesPanel } from "@/components/project/ProjectFilesPanel"
 import { useMemo, useRef, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { toast } from "sonner"
@@ -6,6 +7,8 @@ import { Callout } from "@/components/Callout"
 import { PageHeader } from "@/components/PageHeader"
 import { PlainSelect } from "@/components/access/PolicyEditingKit"
 import { MaterialRow } from "@/components/project/MaterialRow"
+import { ChoosePartDialog } from "@/components/project/ChoosePartDialog"
+import { IssueCoveredDialog } from "@/components/project/IssueCoveredDialog"
 import {
   useAddMaterial,
   useImportBom,
@@ -15,7 +18,7 @@ import {
 import { spaceSectionPath } from "@/lib/navigationContext"
 import { useSpaceStore } from "@/stores/spaceStore"
 import { PROJECT_STATUSES } from "@/pages/workspace/ProjectsPage"
-import type { MaterialCoverageStatus } from "@/api/projects"
+import type { MaterialCoverageStatus, ProjectMaterial } from "@/api/projects"
 import type { ProjectStatus } from "@/api/projects"
 
 /** The distributor exports the backend knows how to read. */
@@ -62,6 +65,10 @@ export function ProjectDetailPage() {
   const [quantity, setQuantity] = useState("1")
   const [reference, setReference] = useState("")
   const [provider, setProvider] = useState(IMPORT_PROVIDERS[0].id)
+
+  /** The line whose part is being chosen, and whether the issue preview is open. */
+  const [choosingPartFor, setChoosingPartFor] = useState<ProjectMaterial | null>(null)
+  const [isIssuing, setIssuing] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
 
   const materials = useMemo(() => {
@@ -100,7 +107,19 @@ export function ProjectDetailPage() {
   }
 
   const { buildability } = project
-  const blocking = new Set(buildability.blockingMaterialIds)
+  const blocking = new Set(buildability.limitingMaterialIds)
+
+  /**
+   * The lines somebody has to do something about.
+   *
+   * ⚠️ **Short and unidentified together, because both stop the build and neither is fixed by the
+   * other.** A part nobody has named cannot be counted at all; a part that is short can. They read as
+   * one list because the question — *what do I have to sort out* — is one question.
+   */
+  const missing = project.materials.filter(
+    (material) => material.coverageStatus === "SHORTAGE" || material.coverageStatus === "UNSOURCED",
+  )
+  const excluded = project.materials.filter((material) => material.excluded).length
 
   function add() {
     addMaterial.mutate(
@@ -136,6 +155,33 @@ export function ProjectDetailPage() {
               All projects
             </Button>
 
+            {/* ⚠️ **The run size, and it belongs beside the stage rather than in a settings pane.** A
+                bill of materials states quantities per unit; this is what multiplies every one of them,
+                so it is the difference between "four resistors" and "eighty". Kept here because it is
+                changed as often as the stage and read every time the coverage is. */}
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              Building
+              <Input
+                type="number"
+                min={1}
+                size="sm"
+                className="w-16 text-center font-mono"
+                defaultValue={project.buildQuantity}
+                onBlur={(event) => {
+                  const wanted = Math.max(1, Number.parseInt(event.target.value, 10) || 1)
+
+                  if (wanted === project.buildQuantity) {
+                    return
+                  }
+
+                  updateProject.mutate(
+                    { projectId: project.id, buildQuantity: wanted },
+                    { onError: () => toast.error("The build quantity was not changed.") },
+                  )
+                }}
+              />
+            </label>
+
             <PlainSelect
               value={project.status}
               className="h-8 w-40 text-xs"
@@ -152,6 +198,22 @@ export function ProjectDetailPage() {
                 </option>
               ))}
             </PlainSelect>
+
+            {/* ⚠️ **The one irreversible act on this screen, so it is a button that opens a preview and
+                never one that does it.** Offered only when something is actually ready — a control that
+                refuses when pressed teaches people to stop pressing it. */}
+            <Button
+              size="sm"
+              disabled={project.coveredMaterialCount === 0}
+              title={
+                project.coveredMaterialCount === 0
+                  ? "No line is fully covered yet"
+                  : "Take the covered lines off the shelf"
+              }
+              onClick={() => setIssuing(true)}
+            >
+              Issue covered
+            </Button>
           </>
         }
       />
@@ -159,10 +221,71 @@ export function ProjectDetailPage() {
       <div className="flex min-w-0 flex-col gap-4">
         <BuildabilityBanner
           buildable={buildability.buildableQuantity}
+          wanted={project.buildQuantity}
           limiting={buildability.limitingMaterialLabel}
-          blockingCount={buildability.blockingMaterialIds.length}
+          alsoLimitingCount={buildability.alsoLimitingCount}
           hasLines={project.totalMaterialCount > 0}
         />
+
+        {/* ⚠️ **Five figures on one line, and the excluded one is among them.** A do-not-fit line is not
+            covered, not short and not unsourced — without a place of its own it simply vanishes from
+            the arithmetic, and the four counters then fail to add up to the number of rows on screen. */}
+        {project.totalMaterialCount > 0 && (
+          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 rounded-md border bg-card/50 px-3 py-1.5 text-xs">
+            <Tally value={project.totalMaterialCount} label="lines" />
+            <Tally value={project.coveredMaterialCount} label="covered" tone="text-emerald-600 dark:text-emerald-400" />
+            <Tally value={project.shortageMaterialCount} label="short" tone="text-destructive" />
+            <Tally value={project.unsourcedMaterialCount} label="unidentified" tone="text-amber-600 dark:text-amber-400" />
+            {excluded > 0 && <Tally value={excluded} label="not fitted" tone="text-muted-foreground" />}
+          </div>
+        )}
+
+        {/* ⚠️ **What is missing, above the bill of materials rather than in a tab.** It is the reason
+            somebody opened the screen, and a tab is a place a reader has to already suspect something
+            is wrong to visit. It disappears entirely when nothing is missing, which is the whole
+            message. */}
+        <ProjectFilesPanel projectId={project.id} />
+
+        {missing.length > 0 && (
+          <details className="rounded-md border" open={missing.length <= 5}>
+            <summary className="cursor-pointer px-3 py-1.5 text-xs font-medium">
+              What is missing
+              <span className="ml-1.5 text-muted-foreground tabular-nums">{missing.length}</span>
+            </summary>
+
+            <div className="min-w-0 overflow-x-auto border-t">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/40 text-[10px] tracking-[0.06em] text-muted-foreground uppercase">
+                    <th className="px-2.5 py-1.5 text-left font-medium">Line</th>
+                    <th className="px-2.5 py-1.5 text-right font-medium">Needs</th>
+                    <th className="px-2.5 py-1.5 text-right font-medium">Free</th>
+                    <th className="px-2.5 py-1.5 text-right font-medium">Short</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {missing.map((material) => (
+                    <tr key={material.id} className="border-b last:border-b-0">
+                      <td className="max-w-96 truncate px-2.5 py-1.5">
+                        {material.referenceDesignator ? `${material.referenceDesignator} · ` : ""}
+                        {material.catalogPartNumberCached ?? material.componentDescription}
+                      </td>
+                      <td className="px-2.5 py-1.5 text-right font-mono tabular-nums">{material.need}</td>
+                      <td className="px-2.5 py-1.5 text-right font-mono tabular-nums text-muted-foreground">
+                        {material.free}
+                      </td>
+                      {/* ⚠️ An unidentified line is short of everything it wants, and the backend cannot
+                          say so — it does not know what the component is, so it has nothing to count. */}
+                      <td className="px-2.5 py-1.5 text-right font-mono tabular-nums text-destructive">
+                        {material.coverageStatus === "UNSOURCED" ? material.need : material.shortage}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        )}
 
         {/* ── Adding a line ────────────────────────────────────────────────── */}
         <div className="flex flex-wrap items-end gap-2 rounded-md border p-3">
@@ -282,6 +405,7 @@ export function ProjectDetailPage() {
                 projectId={project.id}
                 material={material}
                 isBlocking={blocking.has(material.id)}
+                onChoosePart={setChoosingPartFor}
               />
             ))}
           </div>
@@ -298,6 +422,24 @@ export function ProjectDetailPage() {
           )}
         </div>
       </div>
+
+      {choosingPartFor && (
+        <ChoosePartDialog
+          projectId={project.id}
+          material={choosingPartFor}
+          onClose={() => setChoosingPartFor(null)}
+        />
+      )}
+
+      {isIssuing && (
+        <IssueCoveredDialog
+          project={project}
+          onClose={() => setIssuing(false)}
+          /* ⚠️ Nowhere yet — the movement journal is `INVT-0313`. Until it exists the toast is the whole
+             receipt, and sending somebody to a screen that does not exist would be worse than not. */
+          onIssued={() => undefined}
+        />
+      )}
     </>
   )
 }
@@ -309,35 +451,50 @@ export function ProjectDetailPage() {
  */
 function BuildabilityBanner({
   buildable,
+  wanted,
   limiting,
-  blockingCount,
+  alsoLimitingCount,
   hasLines,
 }: {
   buildable: number
+  /** How many the run is for — what the answer is read AGAINST. */
+  wanted: number
   limiting: string | null
-  blockingCount: number
+  /** How many lines beyond the first sit at the same ceiling. */
+  alsoLimitingCount: number
   hasLines: boolean
 }) {
   if (!hasLines) {
     return null
   }
 
-  const tone = buildable === 0 ? "danger" : buildable < 5 ? "warning" : "success"
+  /**
+   * ⚠️ **Judged against the run, never against a number somebody picked.** "Five buildable" is good
+   * news for a prototype and a disaster for a batch of twenty, and a banner that went amber at four
+   * whatever the plan was would be right by accident.
+   */
+  const tone = buildable === 0 ? "danger" : buildable < wanted ? "warning" : "success"
 
   return (
     <Callout tone={tone}>
       <span>
         <strong className={cn("font-mono text-sm", buildable === 0 && "text-destructive")}>{buildable}</strong>{" "}
-        buildable from stock on hand.
+        {wanted > 1 ? (
+          <>
+            of {wanted} buildable from what is free right now.
+          </>
+        ) : (
+          <>buildable from what is free right now.</>
+        )}
         {limiting && (
           <>
             {" "}
             Limited by <strong>{limiting}</strong>
-            {blockingCount > 1 && (
+            {alsoLimitingCount > 0 && (
               <>
                 {" "}
-                — and {blockingCount - 1} other line{blockingCount > 2 ? "s" : ""} sit at the same ceiling,
-                so fixing one of them alone raises nothing.
+                — and {alsoLimitingCount} other line{alsoLimitingCount > 1 ? "s" : ""} sit at the same
+                ceiling, so fixing one of them alone raises nothing
               </>
             )}
             .
@@ -345,5 +502,15 @@ function BuildabilityBanner({
         )}
       </span>
     </Callout>
+  )
+}
+
+/** One figure and what it counts — the row of them above the bill of materials. */
+function Tally({ value, label, tone }: { value: number; label: string; tone?: string }) {
+  return (
+    <span className="flex items-baseline gap-1.5">
+      <span className={cn("font-mono font-medium tabular-nums", tone)}>{value}</span>
+      <span className="text-muted-foreground">{label}</span>
+    </span>
   )
 }

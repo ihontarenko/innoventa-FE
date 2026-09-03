@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
+  NativeSelect,
   Table,
   TableBody,
   TableCell,
@@ -444,19 +445,16 @@ export function PlainSelect({
   children: ReactNode
 }) {
   return (
-    <select
+    <NativeSelect
       value={value}
       disabled={disabled}
       title={title}
       onChange={(event) => onChange(event.target.value)}
-      className={cn(
-        "h-8 w-full min-w-0 rounded-md border bg-transparent px-2 text-sm shadow-xs",
-        "disabled:cursor-not-allowed disabled:opacity-60",
-        className,
-      )}
+      size="sm"
+      className={cn("w-full", className)}
     >
       {children}
-    </select>
+    </NativeSelect>
   )
 }
 

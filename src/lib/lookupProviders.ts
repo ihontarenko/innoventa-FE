@@ -9,7 +9,7 @@
  * comes back from the backend. Hiding one that is not configured would need the browser to know the
  * installation's secrets, which is exactly what it must not.
  */
-export const PRICING_PROVIDERS: Array<{ id: string; label: string }> = [
+export const LOOKUP_PROVIDERS: Array<{ id: string; label: string }> = [
   { id: "mouser", label: "Mouser" },
   { id: "digikey", label: "DigiKey" },
 ]

@@ -67,5 +67,5 @@ export const buildInfoApi = {
  * recover from a 401.
  */
 export const publicConfigurationApi = {
-  read: () => http.get<Record<string, string>>("/config"),
+  read: () => http.get<Record<string, string>>("/public/config"),
 }

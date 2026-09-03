@@ -2,13 +2,12 @@ import { useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { toast } from "sonner"
 import { ArrowLeft } from "lucide-react"
-import { Badge, Button, Skeleton } from "@jmouse/ui"
+import { Button, Skeleton } from "@jmouse/ui"
 import { PageHeader } from "@/components/PageHeader"
-import { TagEditor } from "@/components/TagEditor"
 import { LoadFailureNotice } from "@/components/LoadFailureNotice"
 import { ChildPickerDialog } from "@/components/form/builder/ChildPickerDialog"
 import { FieldEditor } from "@/components/form/builder/FieldEditor"
-import { USAGE_TYPES, fieldTypeOf } from "@/lib/fieldTypes"
+import { fieldTypeOf } from "@/lib/fieldTypes"
 import { describeQueryFailure } from "@/lib/loadFailure"
 import { spaceSectionPath } from "@/lib/navigationContext"
 import { useDeleteField } from "@/hooks/useFieldCatalogue"
@@ -59,20 +58,20 @@ export function FieldDetailPage() {
 
   const field = query.data
   const descriptor = fieldTypeOf(field.elementType)
-  const usage = USAGE_TYPES.find((candidate) => candidate.value === field.usageType)
 
   return (
     <>
+      {/*
+        ⚠️ **The header says where you are, and stops there — the editor says what this field IS.**
+        It used to repeat the codename, the type and the usage on a second line, an inch above the
+        editor's own identity strip which shows all three again *and lets you change them*: the same
+        four facts twice, the higher copy the one you cannot edit. A page header names the page; the
+        name is the one thing it may share with the content, because that is what a header is.
+
+        The type and the usage have a home already — *Shape*, the first card, where they are chosen.
+      */}
       <PageHeader
         title={`${field.icon || descriptor.glyph} ${field.label}`}
-        description={
-          <span className="flex flex-wrap items-center gap-2">
-            <span className="font-mono">{field.name}</span>
-            <Badge variant="secondary">{descriptor.label}</Badge>
-            {usage && <Badge variant="outline">{usage.label}</Badge>}
-            {field.unit && <Badge variant="secondary">{field.unit}</Badge>}
-          </span>
-        }
         actions={
           <>
             <Button asChild variant="ghost" size="sm">
@@ -114,18 +113,21 @@ export function FieldDetailPage() {
         }
       />
 
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-3">
-        <div className="overflow-hidden rounded-lg border">
-          <FieldEditor fieldId={field.id} variant="page" onPickChild={() => setPickingChild(true)} />
-        </div>
+      {/*
+        ⚠️ **No box around the editor, and no width it has to sit inside.** This screen used to draw a
+        `max-w-5xl` bordered card and centre it, which on a wide monitor is a form standing in the middle
+        of an empty page — and the editor's own cards were then a box inside a box inside a page. The
+        editor already paints its own tiles; the page's job is to give them the width, which is also what
+        lets the two-column grid stop being two narrow columns beside a wide margin.
 
-        {/* ⚠️ A card of its own, as the old interface had it — and NOT inside the editor's footer. A tag
-            writes immediately and the editor's Save covers a draft; putting the two under one button was
-            the thing that made the old screen's Save ambiguous. */}
-        <div className="flex flex-col gap-2 rounded-lg border p-3">
-          <span className="text-[11px] font-semibold tracking-[0.06em] uppercase">Tags</span>
-          <TagEditor entityId={field.id} entityKind="FIELD" />
-        </div>
+        ⚠️ **The Tags card is gone because it was the SECOND one.** `AdvancedSection` has carried a
+        `TagEditor` for this field since the editor was built, so the page drew the same control twice —
+        which is most of why it read as assembled rather than designed. The note that used to be here
+        argued tags must not sit under the editor's Save; they do not, and never did: the card in
+        *Advanced* says in as many words that it writes immediately and that Save does not cover it.
+      */}
+      <div className="flex w-full flex-col gap-3">
+        <FieldEditor fieldId={field.id} variant="page" onPickChild={() => setPickingChild(true)} />
       </div>
 
       <ChildPickerDialog fieldId={field.id} open={isPickingChild} onClose={() => setPickingChild(false)} />

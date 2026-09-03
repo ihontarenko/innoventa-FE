@@ -15,14 +15,6 @@ export const OPTION_SOURCE_KEYS = {
 
 export const STATIC_OPTION_SOURCE = "static"
 
-/**
- * The `value_field` naming the entry's own identifier rather than one of its fields.
- *
- * ⚠️ A reserved token, and it has to be: an identifier is not a row in `fields`, so no field name could
- * stand for it.
- */
-export const IDENTITY_VALUE = ":id"
-
 /** What an identity that has lost what it pointed at reads as. Mirrors the backend's `OptionLabels`. */
 export const TOMBSTONE_LABEL = "‹deleted›"
 
@@ -32,31 +24,13 @@ export const TOMBSTONE_LABEL = "‹deleted›"
  * ⚠️ **Additive on the server**, so anything this list has not heard of falls back to a text input
  * rather than breaking the editor — a new kind must cost a plainer control, never a blank screen.
  */
-export type OptionParameterKind =
-  | "TEXT"
-  | "EXPRESSION"
-  | "FORM"
-  | "FIELD_OF"
-  | "KEY_FIELD"
-  | "CHOICE"
-  | (string & NonNullable<unknown>)
-
-export interface OptionChoice {
-  value: string
-  label: string
-  /** What choosing it means, in the source's own words. */
-  consequence: string
-}
+export type OptionParameterKind = "TEXT" | "EXPRESSION" | (string & NonNullable<unknown>)
 
 export interface OptionParameter {
   name: string
   label: string
   kind: OptionParameterKind
   required: boolean
-  /** For `FIELD_OF` and `KEY_FIELD`: the parameter naming the form whose fields are the candidates. */
-  dependsOn: string | null
-  /** For `CHOICE`: the values on offer, the first being the default. Empty for every other kind. */
-  choices: OptionChoice[]
   hint: string | null
 }
 
@@ -94,7 +68,7 @@ export const optionSourcesApi = {
     request: { query: string | null; draftValues: Record<string, string> },
     page = 0,
     size = 50,
-  ) => http.post<OptionPage>(`/fields/${fieldId}/options?page=${page}&size=${size}`, request),
+  ) => http.post<OptionPage>(`/option-sources/for-field/${fieldId}?page=${page}&size=${size}`, request),
 
   /** What a configuration would offer, before it is saved onto a field. */
   preview: (

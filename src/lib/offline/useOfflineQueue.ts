@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react"
 import { entriesApi } from "@/api/forms"
 import { fileOwner, filesApi } from "@/api/files"
+import { stockApi } from "@/api/stock"
+import type { MovementReason } from "@/api/stock"
 import { cabinetId } from "@/hooks/useFiles"
 import type { NewQueuedEdit, QueuedEdit, SetAsideEdit } from "./queue"
 import { discardSetAside, drainQueue, keepBytes, queueEdit, readBytes, readQueue, readSetAside } from "./queue"
@@ -31,9 +33,14 @@ export interface OfflineQueue {
 
 /**
  * ⚠️ **One edit, sent the way its kind means.** An adjustment is a delta and has to be applied to
- * whatever the server holds *now* — reading first and writing the sum is the closest a REST entry API
- * gets to that, and it is what keeps two people counting one shelf from erasing each other. A
- * whole-entry edit is absolute and goes straight out.
+ * whatever the server holds *now*, so it goes to the stock route as a movement with a reason — the
+ * server adds it to the current figure, which is what keeps two people counting one shelf from erasing
+ * each other. A whole-entry edit is absolute and goes straight out.
+ *
+ * ⚠️ **It used to read the entry and write back the sum**, and that stopped working the day a quantity
+ * became something only a movement changes: every touch of ±1 came back 409. Sending the delta is not
+ * the workaround for that guard — it is what the guard exists to insist on, and it is better than what
+ * it replaced, because the sum was computed from a figure that could already be stale.
  */
 async function sendEdit(edit: QueuedEdit): Promise<void> {
   if (edit.kind === "set") {
@@ -69,18 +76,27 @@ async function sendEdit(edit: QueuedEdit): Promise<void> {
     return
   }
 
-  const current = await entriesApi.get(edit.formId, edit.entryId)
-  const values = { ...(current.data.fieldValues ?? {}) }
-  const held = Number(values[edit.fieldName] ?? "")
+  await stockApi.adjust(edit.entryId, {
+    delta: edit.delta,
+    reason: reasonFor(edit.delta),
+    surface: "STATION",
+  })
+}
 
-  if (!Number.isFinite(held)) {
-    // Not a number any more — somebody changed what this field means. The queue must not guess.
-    throw { status: 409 }
-  }
-
-  values[edit.fieldName] = String(Math.max(0, held + edit.delta))
-
-  await entriesApi.update(edit.formId, edit.entryId, values)
+/**
+ * What a press at the shelf means, read from its sign.
+ *
+ * ⚠️ **Not `COUNT`, and not a question asked on the screen.** One less at a shelf is a part taken to be
+ * used and one more is a part coming back — those are `ISSUE` and `RECEIPT` in the journal's own words,
+ * and both are reasons whose sign can only ever match. Calling every press a stocktake would file
+ * ordinary work as counting and leave a real stocktake indistinguishable from it; asking which it was
+ * would put a tap in front of the one interaction the station exists to make instant.
+ *
+ * ⚠️ **A press with no project behind it still has no project.** `ISSUE` normally carries one and here
+ * carries none — that is the honest record of a part taken at a bench, not a field left unfilled.
+ */
+function reasonFor(delta: number): MovementReason {
+  return delta < 0 ? "ISSUE" : "RECEIPT"
 }
 
 export function useOfflineQueue(): OfflineQueue {

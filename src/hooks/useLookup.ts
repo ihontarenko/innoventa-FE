@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { pricingApi, type PricingResult } from "@/api/pricing"
+import { lookupApi, type LookupResult } from "@/api/lookup"
 
 /**
  * A distributor's answer about a part.
@@ -12,10 +12,10 @@ import { pricingApi, type PricingResult } from "@/api/pricing"
  * a part number is entered whole, and a request per keystroke is a request per keystroke against a paid
  * API.
  */
-export function usePricingSearch(provider: string, query: string, enabled: boolean) {
-  return useQuery<PricingResult>({
-    queryKey: ["pricing", provider, query],
-    queryFn: () => pricingApi.search(provider, query).then((response) => response.data),
+export function useLookupSearch(provider: string, query: string, enabled: boolean) {
+  return useQuery<LookupResult>({
+    queryKey: ["lookup", provider, query],
+    queryFn: () => lookupApi.search(provider, query).then((response) => response.data),
     enabled: enabled && query.length > 0,
     staleTime: 5 * 60_000,
     // ⚠️ Never retried. A missing API key and a rate limit both come back as errors, and retrying either

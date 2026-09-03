@@ -145,7 +145,7 @@ export function EntryDetailDrawer({
   /**
    * Whether asking a distributor about this row means anything.
    *
-   * ⚠️ **By PURPOSE, not by whether the form maps anything.** Gating on a `pricing.*` key was tried and
+   * ⚠️ **By PURPOSE, not by whether the form maps anything.** Gating on a `catalogue.*` key was tried and
    * is wrong twice over: a type that maps nothing is exactly the one whose owner has not discovered the
    * feature, and *reading* a distributor's answer — the price, the stock, the datasheet — is worth
    * having with nothing to apply it to. The dialog says what can and cannot land; the button says the

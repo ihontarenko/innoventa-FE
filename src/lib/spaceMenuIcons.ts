@@ -1,5 +1,6 @@
 import {
   ArrowLeftRight,
+  Ruler,
   BellRing,
   Boxes,
   CalendarClock,
@@ -43,6 +44,10 @@ const ICONS_BY_KEY: Record<string, LucideIcon> = {
   attention: BellRing,
   categories: FolderTree,
   "component-types": Cpu,
+  // ⚠️ Both of these arrived with the regrouping and both fell through to the same fallback glyph, so
+  // two unrelated rows looked like a pair. A menu whose icons repeat is a menu read by its labels only.
+  movements: ArrowLeftRight,
+  cad: Ruler,
   entry: FileText,
   fields: SlidersHorizontal,
   files: Layers,

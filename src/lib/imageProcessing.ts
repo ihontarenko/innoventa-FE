@@ -1,4 +1,11 @@
-import { keepingFormatOf, type ImageCropSpecification, type ImageFormat } from "@jmouse/ui"
+import {
+  COMMON_RATIOS,
+  keepingFormatOf,
+  type CropRatio,
+  type ImageCropSpecification,
+  type ImageFormat,
+} from "@jmouse/ui"
+import { IMAGE_CONFIG_KEYS } from "./fieldConfigs"
 
 /**
  * What a field asks of a picture, and how that reaches the shared cropper.
@@ -17,11 +24,12 @@ import { keepingFormatOf, type ImageCropSpecification, type ImageFormat } from "
  * Whether a picture is framed on its way into a field, and whether the person may decline.
  *
  * ⚠️ **`offered` is the default, and that is the whole point of the three states.** `image.crop` is set
- * on no field in this installation and has a control on no screen — it can only be typed into the
- * field editor's raw key/value map — so a two-state flag defaulting to off meant every dynamic form in
- * the product silently had no cropper at all. A picture somebody attaches to a form is a picture they
- * may want to trim; the offer costs one dismissible dialog and is skippable, and the original goes up
- * untouched when it is skipped.
+ * on no field in this installation, and until the field editor grew its *Picture* card it had a control
+ * on no screen either — so a two-state flag defaulting to off meant every dynamic form in the product
+ * silently had no cropper at all. A picture somebody attaches to a form is a picture they may want to
+ * trim; the offer costs one dismissible dialog and is skippable, and the original goes up untouched
+ * when it is skipped. The card is where a field says otherwise; the default stands for every field
+ * that never does.
  */
 export type CropDemand = "required" | "offered" | "off"
 
@@ -33,6 +41,13 @@ export interface ImageProcessing {
   /** ⚠️ `null` means the field named none — which is not the same as naming JPEG. */
   format: string | null
   quality: number
+  /**
+   * The shapes the field offers while framing. `null` offers none — see {@link cropSpecificationFor}
+   * for the one case where that is decided rather than configured.
+   */
+  ratios: CropRatio[] | null
+  /** Whether a corner may be dragged to a shape the field did not list. */
+  reshape: boolean
 }
 
 export function imageProcessingOf(configs: Record<string, string>): ImageProcessing {
@@ -42,15 +57,64 @@ export function imageProcessingOf(configs: Record<string, string>): ImageProcess
     return Number.isNaN(parsed) ? null : parsed
   }
 
-  const quality = Number.parseFloat(configs["image.quality"] ?? "")
+  const quality = Number.parseFloat(configs[IMAGE_CONFIG_KEYS.QUALITY] ?? "")
 
   return {
-    crop: cropDemandOf(configs["image.crop"]),
-    maxWidth: asInteger("image.max_width"),
-    maxHeight: asInteger("image.max_height"),
-    format: configs["image.format"]?.toLowerCase() || null,
+    crop: cropDemandOf(configs[IMAGE_CONFIG_KEYS.CROP]),
+    maxWidth: asInteger(IMAGE_CONFIG_KEYS.MAX_WIDTH),
+    maxHeight: asInteger(IMAGE_CONFIG_KEYS.MAX_HEIGHT),
+    format: configs[IMAGE_CONFIG_KEYS.FORMAT]?.toLowerCase() || null,
     quality: Number.isNaN(quality) ? 0.92 : quality,
+    ratios: ratiosOf(configs[IMAGE_CONFIG_KEYS.RATIOS]),
+    reshape: configs[IMAGE_CONFIG_KEYS.RESHAPE] !== "false",
   }
+}
+
+/**
+ * Which shapes a field offers, written as a list — `original, square, 16:9` — or left unsaid.
+ *
+ * ⚠️ **Silence means all of them, not none.** Every dynamic field in this installation names no image
+ * configuration at all (which is the same reason `image.crop` defaults to *offered*), so a key that
+ * had to be typed in before the ratios appeared would be a control nobody ever saw. The shape of a
+ * picture somebody is attaching is theirs; a field takes it away only by saying so.
+ *
+ * ⚠️ **`none` is how a field says so, and it is not the same as an empty string.** An empty value is a
+ * key somebody cleared, which should behave as though it were never set.
+ */
+function ratiosOf(configured: string | undefined): CropRatio[] | null {
+  const written = configured?.trim().toLowerCase()
+
+  if (!written) {
+    return COMMON_RATIOS
+  }
+
+  if (written === "none") {
+    return null
+  }
+
+  const named = written
+    .split(",")
+    .map((token) => ratioOf(token.trim()))
+    .filter((ratio): ratio is CropRatio => ratio !== null)
+
+  return named.length > 0 ? named : COMMON_RATIOS
+}
+
+/** One token of `image.ratios` — a name the shared list already knows, or a bare `width:height`. */
+function ratioOf(token: string): CropRatio | null {
+  const known = COMMON_RATIOS.find((ratio) => ratio.label.toLowerCase() === token)
+
+  if (known) {
+    return known
+  }
+
+  const [width, height] = token.split(":").map(Number)
+
+  if (!width || !height || width < 0 || height < 0) {
+    return null
+  }
+
+  return { label: `${width}:${height}`, aspect: width / height }
 }
 
 /**
@@ -78,6 +142,11 @@ function cropDemandOf(configured: string | undefined): CropDemand {
  * handed a portrait region that every screen would squash. A field naming only one dimension, or
  * neither, gets a frame the picture's own shape, which is the honest default when nobody said.
  *
+ * ⚠️ **And a field that names BOTH dimensions offers no shapes either, whatever it configured.** The
+ * two numbers are that field saying *this slot is exactly this shape*; a row of ratios above it would
+ * be offering to break the thing the field was measured for. Every other field lets the person choose,
+ * because the picture's shape is then theirs and nothing downstream depends on it.
+ *
  * ⚠️ **A field that names no format keeps the picture's own.** Re-encoding is a change the person
  * accepting a crop did not ask for and cannot see: a 400 kB JPEG photograph arriving as a
  * six-megabyte PNG, or a screenshot's flat colour arriving with JPEG ringing around every letter. Only
@@ -87,11 +156,15 @@ export function cropSpecificationFor(
   processing: ImageProcessing,
   picture: File,
 ): Partial<ImageCropSpecification> {
+  const shapeIsTheFieldsOwn = processing.maxWidth !== null && processing.maxHeight !== null
+
   const asked: Partial<ImageCropSpecification> = {
     shape: "rectangle",
     outputWidth: processing.maxWidth,
     outputHeight: processing.maxHeight,
     quality: processing.quality,
+    ratios: shapeIsTheFieldsOwn ? null : processing.ratios,
+    resizable: !shapeIsTheFieldsOwn && processing.reshape,
   }
 
   if (processing.format) {

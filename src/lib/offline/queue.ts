@@ -29,6 +29,8 @@
  * its own is both durable and cheap to iterate in order.
  */
 
+import { detailOf } from "@/lib/apiErrors"
+
 const DATABASE_NAME = "innoventa-station-offline"
 const DATABASE_VERSION = 2
 const QUEUE_STORE = "queue"
@@ -266,7 +268,7 @@ export async function drainQueue(
         continue
       }
 
-      await setAside(edit, refusalWords(status))
+      await setAside(edit, refusalWords(status, failure))
       outcome.setAside += 1
     }
   }
@@ -274,7 +276,16 @@ export async function drainQueue(
   return outcome
 }
 
-function refusalWords(status: number): string {
+/**
+ * Why an edit was set aside, in words the person holding the phone can act on.
+ *
+ * ⚠️ **A domain refusal says it better than this function can, so it wins.** *"There are only 3 of
+ * 'SS34', so 5 cannot be taken"* tells somebody at a shelf what to do; *"it may have conflicted with
+ * somebody else's"* sends them looking for a colleague who was never there. The canned sentences stay
+ * for the statuses that carry no such message — a deleted position, a revoked permission — and for a
+ * server that answered with nothing readable.
+ */
+function refusalWords(status: number, failure: unknown): string {
   if (status === 404) {
     return "What this changed no longer exists."
   }
@@ -282,7 +293,7 @@ function refusalWords(status: number): string {
     return "You no longer have permission to make this change here."
   }
   if (status === 409 || status === 422 || status === 400) {
-    return "The change was refused — it may have conflicted with somebody else's."
+    return detailOf(failure) ?? "The change was refused — it may have conflicted with somebody else's."
   }
 
   return `The change was refused (${status}).`

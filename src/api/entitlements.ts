@@ -130,21 +130,21 @@ export const organizationPlanApi = {
 
 /** The plan catalogue, which organisation is on what, and everything that changes either. */
 export const planAdministrationApi = {
-  catalogue: () => http.get<Plan[]>("/plan-administration/plans"),
+  catalogue: () => http.get<Plan[]>("/admin/plans/plans"),
 
-  organizations: () => http.get<AdministeredOrganization[]>("/plan-administration/organizations"),
+  organizations: () => http.get<AdministeredOrganization[]>("/admin/plans/organizations"),
 
   organization: (organizationId: string) =>
-    http.get<OrganizationPlan>(`/plan-administration/organizations/${organizationId}`),
+    http.get<OrganizationPlan>(`/admin/plans/organizations/${organizationId}`),
 
   assignPlan: (organizationId: string, payload: { planCode: string }) =>
-    http.put<OrganizationPlan>(`/plan-administration/organizations/${organizationId}/plan`, payload),
+    http.put<OrganizationPlan>(`/admin/plans/organizations/${organizationId}/plan`, payload),
 
   startTrial: (organizationId: string, payload: { planCode: string; until: string }) =>
-    http.post<OrganizationPlan>(`/plan-administration/organizations/${organizationId}/trial`, payload),
+    http.post<OrganizationPlan>(`/admin/plans/organizations/${organizationId}/trial`, payload),
 
   endTrial: (organizationId: string) =>
-    http.delete<OrganizationPlan>(`/plan-administration/organizations/${organizationId}/trial`),
+    http.delete<OrganizationPlan>(`/admin/plans/organizations/${organizationId}/trial`),
 
   /**
    * Gives an organisation something outside its plan. Issued with `source: GRANT`, which is what makes
@@ -159,9 +159,9 @@ export const planAdministrationApi = {
       period?: string | null
       until?: string | null
     },
-  ) => http.post<OrganizationPlan>(`/plan-administration/organizations/${organizationId}/grants`, payload),
+  ) => http.post<OrganizationPlan>(`/admin/plans/organizations/${organizationId}/grants`, payload),
 
-  withdrawGrant: (grantId: string) => http.delete<void>(`/plan-administration/grants/${grantId}`),
+  withdrawGrant: (grantId: string) => http.delete<void>(`/admin/plans/grants/${grantId}`),
 }
 
 // ── Governing workspaces from the platform ───────────────────────────────────
@@ -241,17 +241,17 @@ export interface AdministeredSpaceDetail {
 
 export const workspaceAdministrationApi = {
   list: (search?: string) =>
-    http.get<AdministeredSpace[]>("/workspace-administration", { params: search ? { search } : undefined }),
+    http.get<AdministeredSpace[]>("/admin/spaces", { params: search ? { search } : undefined }),
 
   /** ⚠️ Opening somebody else's workspace is a sensitive read and is recorded server-side. */
-  open: (spaceId: string) => http.get<AdministeredSpaceDetail>(`/workspace-administration/${spaceId}`),
+  open: (spaceId: string) => http.get<AdministeredSpaceDetail>(`/admin/spaces/${spaceId}`),
 
   withhold: (spaceId: string, capability: string, payload: { reason: string }) =>
     http.put<AdministeredSpaceDetail>(
-      `/workspace-administration/${spaceId}/capabilities/${capability}/withholding`,
+      `/admin/spaces/${spaceId}/capabilities/${capability}/withholding`,
       payload,
     ),
 
   release: (spaceId: string, capability: string) =>
-    http.delete<AdministeredSpaceDetail>(`/workspace-administration/${spaceId}/capabilities/${capability}/withholding`),
+    http.delete<AdministeredSpaceDetail>(`/admin/spaces/${spaceId}/capabilities/${capability}/withholding`),
 }

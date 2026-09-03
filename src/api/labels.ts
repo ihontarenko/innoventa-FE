@@ -14,11 +14,11 @@ import type {
 export const labelTemplatesApi = {
     /** Mine, plus whatever is shared into the active workspace. */
     list: () =>
-        http.get<LabelTemplateSummary[]>('/label-templates'),
+        http.get<LabelTemplateSummary[]>('/labels/templates'),
 
     /** The designs that could serve a record on this form — what a print picker offers. */
     forForm: (formId: string) =>
-        http.get<LabelTemplateSummary[]>('/label-templates/for-form', { params: { formId } }),
+        http.get<LabelTemplateSummary[]>('/labels/templates/for-form', { params: { formId } }),
 
     /**
      * Which of these forms already have a design.
@@ -33,32 +33,32 @@ export const labelTemplatesApi = {
      * form, so nothing needs it today.
      */
     coveredForms: (formIds: string[]) =>
-        http.get<string[]>('/label-templates/covered-forms', { params: { formIds: formIds.join(',') } }),
+        http.get<string[]>('/labels/templates/covered-forms', { params: { formIds: formIds.join(',') } }),
 
     detail: (templateId: string) =>
-        http.get<LabelTemplateDetail>(`/label-templates/${templateId}`),
+        http.get<LabelTemplateDetail>(`/labels/templates/${templateId}`),
 
     create: (payload: SaveLabelTemplatePayload) =>
-        http.post<LabelTemplateDetail>('/label-templates', payload),
+        http.post<LabelTemplateDetail>('/labels/templates', payload),
 
     update: (templateId: string, payload: SaveLabelTemplatePayload) =>
-        http.put<LabelTemplateDetail>(`/label-templates/${templateId}`, payload),
+        http.put<LabelTemplateDetail>(`/labels/templates/${templateId}`, payload),
 
     /** A copy, owned by whoever pressed it — how a 12×40 arrives from somebody else's 58×40. */
     duplicate: (templateId: string) =>
-        http.post<LabelTemplateDetail>(`/label-templates/${templateId}/duplicate`),
+        http.post<LabelTemplateDetail>(`/labels/templates/${templateId}/duplicate`),
 
     delete: (templateId: string) =>
-        http.delete(`/label-templates/${templateId}`),
+        http.delete(`/labels/templates/${templateId}`),
 
     // ── Sharing ───────────────────────────────────────────────────────────────
 
     shares: (templateId: string) =>
-        http.get<string[]>(`/label-templates/${templateId}/shares`),
+        http.get<string[]>(`/labels/templates/${templateId}/shares`),
 
     /** The whole set at once: "which workspaces is this in" is one question with one answer. */
     share: (templateId: string, spaceIds: string[]) =>
-        http.put<string[]>(`/label-templates/${templateId}/shares`, { spaceIds }),
+        http.put<string[]>(`/labels/templates/${templateId}/shares`, { spaceIds }),
 };
 
 /**

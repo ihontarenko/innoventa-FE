@@ -27,6 +27,7 @@ import { StationChrome } from "@/pages/station/StationChrome"
 import { SetAsideList } from "@/pages/station/components/SetAsideList"
 import { AddComponent } from "@/pages/station/components/AddComponent"
 import { EditComponent } from "@/pages/station/components/EditComponent"
+import { readableValueOf } from "@/lib/entryLabels"
 import { applyDelta, imageFieldOf, primaryFieldOf, rememberCountField, resolveCountField } from "./countField"
 
 const INVENTORY = "INVENTORY"
@@ -309,7 +310,7 @@ export function ComponentsStation() {
                     className="border-border active:bg-accent flex min-h-16 w-full items-center justify-between gap-3 rounded-lg border px-4 py-3 text-left"
                   >
                     <span className="min-w-0 flex-1 truncate text-[14px]">
-                      {titleField ? (entry.fieldValues[titleField.name] ?? "—") : "—"}
+                      {readableValueOf(entry, titleField ?? undefined) || "—"}
                     </span>
                     {shown !== undefined && (
                       <span className="flex shrink-0 items-center gap-2">
@@ -447,7 +448,7 @@ function ComponentDetail({
 
   return (
     <StationChrome
-      title={titleFieldName ? (entry.fieldValues[titleFieldName] ?? "Component") : "Component"}
+      title={readableValueOf(entry, fields.find((field) => field.name === titleFieldName)) || "Component"}
       offline={!queue.online}
       pendingCount={queue.pending.length}
       leading={
@@ -581,7 +582,11 @@ function ComponentDetail({
                     && field.name !== countFieldName,
                 )
                 .map((field) => {
-                  const value = entry.fieldValues[field.name] ?? ""
+                  /* ⚠️ `readableValueOf`, never `fieldValues[…]`. A field whose choices come from a
+                     source stores the chosen row's identifier, so reading the raw map printed
+                     `UT9qbvRJmqFaaiSQ` where the shelf says `SS34FA` — useless to somebody standing in
+                     front of the drawer, which is the only place this screen is ever used. */
+                  const value = readableValueOf(entry, field)
 
                   return (
                     <div key={field.id} className="flex items-baseline justify-between gap-3">

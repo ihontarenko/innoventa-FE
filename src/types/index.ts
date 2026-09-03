@@ -94,6 +94,15 @@ export interface SpaceNavigationItem {
   standing: NavigationStanding
   /** What to tell whoever cannot open it, in the refusing axis's own words. Null where they can. */
   words: string | null
+  /**
+   * The letter that follows `g` to come here — `"p"` for `g p`. Absent for an item with no shortcut.
+   *
+   * ⚠️ **Served, not mapped here.** A table of shortcuts kept in the interface would be a second list
+   * to hold in step with the menu, and its failure is silent: a key that navigates to something the
+   * menu no longer offers. ⚠️ **And bound by POSITION** — `p` is `з` on a Ukrainian layout, so the
+   * registry matches `event.code`, never the character.
+   */
+  shortcut?: string
 }
 
 /** A group of entries, named by whoever contributed it — an area that supplies sections names them. */

@@ -1,4 +1,4 @@
-import { Input, cn } from "@jmouse/ui"
+import { Input, NativeSelect, cn } from "@jmouse/ui"
 import { htmlAttributesOf } from "@/lib/fieldAttributes"
 import { unitOptionsOf } from "@/lib/fieldOptions"
 import { ChildFieldControl } from "./ChildFieldControl"
@@ -62,10 +62,10 @@ export function SimpleCompositeControl({ field, value, onChange, hasError }: Con
       />
 
       {unitOptions.length > 0 && (
-        <select
+        <NativeSelect
           aria-label="Unit"
           className={cn(
-            "h-9 shrink-0 rounded-md border bg-transparent px-2 font-mono text-sm shadow-xs",
+            "shrink-0 font-mono",
             hasError && "border-destructive",
           )}
           value={effectiveUnit}
@@ -77,7 +77,7 @@ export function SimpleCompositeControl({ field, value, onChange, hasError }: Con
               {option.label}
             </option>
           ))}
-        </select>
+        </NativeSelect>
       )}
     </div>
   )

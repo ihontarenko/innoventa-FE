@@ -5,7 +5,17 @@ import { PageHeader } from "@/components/PageHeader"
 import { PageMarkdown } from "@/components/markdown/PageMarkdown"
 import { INERT_SURFACE } from "@/components/markdown/surface"
 import { useCabinetRoot } from "@/hooks/useFiles"
+import { useMyPermissions } from "@/hooks/useAccess"
 import { innoventaFileLibrary } from "@/lib/fileLibraryPort"
+
+/**
+ * The right to say what a folder accepts.
+ *
+ * ⚠️ **Its own permission, and deliberately not `file:write`.** The file library reserves no type — a
+ * folder may be configured to admit `.exe` — so this is the right to decide what may be put into the
+ * installation at all, which is a different question from whether somebody may upload a datasheet.
+ */
+const DIRECTORY_POLICY = "directory:policy"
 
 /**
  * Files — the account's own cabinet, on the shared file library.
@@ -35,10 +45,15 @@ import { innoventaFileLibrary } from "@/lib/fileLibraryPort"
  */
 export function FilesPage() {
   const { data: rootId, isLoading, isError } = useCabinetRoot()
+  const { data: mine } = useMyPermissions()
+
+  const canConfigure = Boolean(mine?.permissions.includes(DIRECTORY_POLICY))
 
   // ⚠️ Memoised, and it matters: the manager loads the tree in an effect keyed on the port, so a new
-  // object every render would refetch on every render.
-  const port = useMemo(() => innoventaFileLibrary(), [])
+  // object every render would refetch on every render. Keyed on the permission too — it arrives after
+  // the first paint, and a port built before it would offer no Configuration item to somebody who holds
+  // the right.
+  const port = useMemo(() => innoventaFileLibrary(new Map(), canConfigure), [canConfigure])
 
   if (isError) {
     return (

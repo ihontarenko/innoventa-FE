@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from "react-router-dom"
+import { NavLink, useLocation, useNavigate } from "react-router-dom"
 import { Bookmark, Pin, TriangleAlert } from "lucide-react"
 import { activePath } from "@/lib/menuActivation"
 import {
@@ -13,6 +13,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   Skeleton,
+  useKeyboardShortcuts,
 } from "@jmouse/ui"
 import { InnoventaMark } from "@/components/icons/InnoventaMark"
 import { AccountMenu } from "@/components/layout/AccountMenu"
@@ -47,6 +48,40 @@ function WorkspaceMenu({ spaceId, spaceSlug, pathname }: { spaceId: string; spac
   // server; this hides what one reader asked not to see and changes nothing for anybody else.
   const preferences = useNavigationPreferencesStore((state) => state.preferences)
   const hidden = hiddenItemKeysIn(preferences, spaceScope(spaceId))
+  const navigate = useNavigate()
+
+  /**
+   * ⚠️ **Computed BEFORE the early returns, because the shortcuts below are a hook.** While the menu is
+   * loading there is nothing to bind and the list is empty — but the hook still has to run, or the
+   * number of hooks changes between the loading render and the loaded one, which React refuses.
+   */
+  const sections = (data?.sections ?? [])
+    .map((section) => ({ ...section, items: section.items.filter((item) => !hidden.includes(item.key)) }))
+    .filter((section) => section.items.length > 0)
+
+  /**
+   * `g` then a letter, built from the menu the server served.
+   *
+   * ⚠️ **Only for items that will actually open.** A refused item keeps its shortcut in the answer — the
+   * menu still shows it, closed, with the words that explain why — but binding the key would turn a
+   * keystroke into a refusal nobody can trace to a control they pressed.
+   *
+   * ⚠️ **And only for items still in the menu.** `sections` is already filtered by this person's own
+   * tidying, so a hidden screen has no key either: a shortcut to something somebody chose not to see is
+   * the tidying not being honoured.
+   */
+  useKeyboardShortcuts(
+    sections.flatMap((section) =>
+      section.items
+        .filter((item) => item.shortcut && item.standing === "PERMITTED")
+        .map((item) => ({
+          keys: `g ${item.shortcut}`,
+          describes: item.label,
+          group: "Go to",
+          run: () => navigate(spaceSectionPath(spaceSlug, item.path)),
+        })),
+    ),
+  )
 
   if (isLoading) {
     return (
@@ -73,10 +108,6 @@ function WorkspaceMenu({ spaceId, spaceSlug, pathname }: { spaceId: string; spac
       </SidebarGroup>
     )
   }
-
-  const sections = data.sections
-    .map((section) => ({ ...section, items: section.items.filter((item) => !hidden.includes(item.key)) }))
-    .filter((section) => section.items.length > 0)
 
   const allPaths = sections.flatMap((section) => section.items.map((item) => spaceSectionPath(spaceSlug, item.path)))
   const active = activePath(allPaths, pathname)
@@ -114,6 +145,15 @@ function WorkspaceMenu({ spaceId, spaceSlug, pathname }: { spaceId: string; spac
                           <Icon />
                           <span className="truncate">{item.label}</span>
                           <PlanMark standing={item.standing} />
+                          {/* ⚠️ Shown, not just bound. A shortcut nobody can see is a shortcut only
+                              whoever wrote it uses; the row is where somebody learns it, because it is
+                              where they already are when they want to go there. Hidden on a collapsed
+                              rail, where there is no room for the label either. */}
+                          {item.shortcut && (
+                            <kbd className="text-muted-foreground border-border ml-auto hidden rounded-[2px] border px-1 py-px font-mono text-[10px] leading-none group-data-[collapsible=icon]:hidden md:inline">
+                              g {item.shortcut}
+                            </kbd>
+                          )}
                         </NavLink>
                       )}
                     </SidebarMenuButton>

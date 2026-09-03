@@ -6,6 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
   Input as ShadcnInput,
+  NativeSelect,
   Textarea as ShadcnTextarea,
 } from "@jmouse/ui"
 import type { MarkdownUiKit } from "@jmouse/markdown"
@@ -70,8 +71,8 @@ export const INNOVENTA_MARKDOWN_UI: MarkdownUiKit = {
   ),
 
   Select: ({ value, onChange, options }) => (
-    <select
-      className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+    <NativeSelect
+      className="w-full"
       value={value}
       onChange={(event) => onChange(event.target.value)}
     >
@@ -80,7 +81,7 @@ export const INNOVENTA_MARKDOWN_UI: MarkdownUiKit = {
           {option.label}
         </option>
       ))}
-    </select>
+    </NativeSelect>
   ),
 
   Textarea: ({ value, onChange, rows, placeholder, spellCheck }) => (

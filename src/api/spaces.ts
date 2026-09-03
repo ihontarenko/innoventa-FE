@@ -93,7 +93,7 @@ export interface ReachableContext {
 }
 
 export const contextApi = {
-  read: () => http.get<ReachableContext>("/context"),
+  read: () => http.get<ReachableContext>("/navigation"),
 }
 
 export type SpaceMemberRole = "OWNER" | "ADMIN" | "MEMBER" | "VIEWER"

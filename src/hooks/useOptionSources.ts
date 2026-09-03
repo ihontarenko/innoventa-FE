@@ -13,10 +13,19 @@ export function useOptionSourceDescriptors() {
 /**
  * One page of a field's choices.
  *
- * ⚠️ **Refetched on open and on what has been typed — nothing else.** Choices may depend on the draft
- * entry, so keying on `draftValues` would refetch on every keystroke in a neighbouring field. The one
- * stale case — a dependency changed while this picker is already open — closes the moment anything is
- * chosen, and the values are still *sent* so the answer is correct when it is asked for.
+ * ⚠️ **The draft is part of the KEY, not just part of the request — and that is the whole correctness
+ * of a dependent picker.** Choices may depend on a neighbouring field: *Part* offers the entries of
+ * whichever type *Type* currently holds. Keying only on the field and the search term tells react-query
+ * that two questions with different answers are the same question, so choosing a type and re-opening
+ * the picker was answered out of the cache — a buzzer type listing a resistor.
+ *
+ * ⚠️ **This was left out on purpose once, on the grounds that keying on the draft would refetch on
+ * every keystroke in a neighbouring field.** It does not: the query runs only while the picker is open
+ * (`enabled`), and a picker is a popover holding focus, so there is no neighbouring field to type in
+ * while it is. The worry was real and the cost it feared is not.
+ *
+ * ⚠️ **The values are hashed by content, not by identity**, so a fresh object on every render — which
+ * is what a form's state is — does not refetch anything on its own.
  */
 export function useFieldOptions(
   fieldId: string,
@@ -25,7 +34,7 @@ export function useFieldOptions(
   enabled: boolean,
 ) {
   return useQuery<OptionPage>({
-    queryKey: ["fields", fieldId, "options", query],
+    queryKey: ["fields", fieldId, "options", query, draftValues],
     queryFn: () =>
       optionSourcesApi.optionsFor(fieldId, { query: query || null, draftValues }).then((response) => response.data),
     enabled,

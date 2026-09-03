@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { Badge, Input, Skeleton, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, cn } from "@jmouse/ui"
+import { Badge, Input, NativeSelect, Skeleton, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, cn } from "@jmouse/ui"
 import type { PermissionDetailView, PermissionSourceView, PlaceStandingView } from "@/api/access"
 import type { PolicyOverrideSeed } from "@/api/policy"
 import { useAccessWho } from "@/hooks/useAccess"
@@ -38,9 +38,9 @@ export function WhoPanel({ onOverride }: { onOverride?: (seed: PolicyOverrideSee
           onChange={(event) => setSearch(event.target.value)}
         />
 
-        <select
+        <NativeSelect
           aria-label="Person"
-          className="h-9 min-w-56 rounded-md border bg-transparent px-2 text-sm shadow-xs"
+          className="min-w-56"
           value={userId ?? ""}
           onChange={(event) => setUserId(event.target.value || null)}
         >
@@ -50,11 +50,11 @@ export function WhoPanel({ onOverride }: { onOverride?: (seed: PolicyOverrideSee
               {person.displayName || person.email}
             </option>
           ))}
-        </select>
+        </NativeSelect>
 
-        <select
+        <NativeSelect
           aria-label="Where"
-          className="h-9 min-w-48 rounded-md border bg-transparent px-2 text-sm shadow-xs"
+          className="min-w-48"
           value={spaceId}
           onChange={(event) => setSpaceId(event.target.value)}
         >
@@ -64,7 +64,7 @@ export function WhoPanel({ onOverride }: { onOverride?: (seed: PolicyOverrideSee
               {space.name}
             </option>
           ))}
-        </select>
+        </NativeSelect>
       </div>
 
       {!userId ? (

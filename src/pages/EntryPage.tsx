@@ -1,17 +1,19 @@
 import { useRef, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { toast } from "sonner"
-import { Search } from "lucide-react"
+import { ArrowDownUp, Search } from "lucide-react"
 import { Button, Skeleton } from "@jmouse/ui"
 import { PageHeader } from "@/components/PageHeader"
 import { DynamicForm } from "@/components/form/DynamicForm"
 import { EntryDossier } from "@/components/entry/EntryDossier"
 import { ShareControl } from "@/components/sharing/ShareControl"
 import { EntryLookupDialog } from "@/components/lookup/EntryLookupDialog"
+import { AdjustQuantityDialog } from "@/components/inventory/AdjustQuantityDialog"
 import { useForm } from "@/hooks/useForms"
 import { useDeleteEntry, useEntry, useUpdateEntry } from "@/hooks/useWorkspaceForms"
 import { LabelPrintButton } from "@/components/labels/LabelPrintButton"
 import { readableMoment } from "@/lib/dates"
+import { readFormConfigs } from "@/lib/formConfigs"
 import { spaceSectionPath } from "@/lib/navigationContext"
 import { useSpaceStore } from "@/stores/spaceStore"
 import type { FormDetail } from "@/types"
@@ -85,7 +87,18 @@ export function EntryPage() {
   const [editing, setEditing] = useState(false)
   const [confirmingRemoval, setConfirmingRemoval] = useState(false)
   const [isLookingUp, setLookingUp] = useState(false)
+  const [isAdjusting, setAdjusting] = useState(false)
   const formRef = useRef<HTMLFormElement | null>(null)
+
+  /**
+   * Which field this record counts with, where it counts at all.
+   *
+   * ⚠️ **Read from the form's binding, never from a field called "quantity".** Whether a record is a
+   * position is a property of its form, and the one place that is written down is `stock.quantity_field`.
+   * A record with no such binding has no quantity to change and is offered nothing.
+   */
+  const quantityField = form ? readFormConfigs(form.config).stockQuantityField : null
+  const held = quantityField && entry ? toNumber(entry.fieldValues[quantityField]) : null
 
   /**
    * ⚠️ **Offered here for the same reason it is offered in the drawer, and by the same test.** Somebody
@@ -194,6 +207,17 @@ export function EntryPage() {
                 </Button>
               )}
 
+              {/* ⚠️ **The only door to the number, and it has to be on the record itself.** Edit opens
+                  the form, and the form's quantity field is read-only — a record whose main figure
+                  cannot be changed from the record is a dead end, and the button that says Edit is
+                  exactly where somebody looks first. */}
+              {quantityField && (
+                <Button variant="outline" size="sm" onClick={() => setAdjusting(true)}>
+                  <ArrowDownUp className="size-3.5" />
+                  Change quantity
+                </Button>
+              )}
+
               {/* ⚠️ The record's own public address, minted from the record. Until this existed a row
                   could be *shown* as shared — `EntryIdentityCard` draws the badge — and never made so,
                   which is why the Sharing Centre counted zero shared entries. */}
@@ -245,6 +269,35 @@ export function EntryPage() {
           onClose={() => setLookingUp(false)}
         />
       )}
+
+      {isAdjusting && (
+        <AdjustQuantityDialog
+          entryId={entry.id}
+          label={titleOf(form, entry)}
+          held={held}
+          onClose={() => setAdjusting(false)}
+        />
+      )}
     </>
   )
+}
+
+/**
+ * What this record is called, for a sentence about it.
+ *
+ * ⚠️ **The form's own title field, not the first value that is filled in.** A position's title is the
+ * part it is a quantity of, and the two are different fields on the same record — printing whichever
+ * came first is how a dialog ends up naming a supplier.
+ */
+function titleOf(form: FormDetail, entry: { fieldValues: Record<string, string> }): string {
+  const primary = readFormConfigs(form.config).primaryField
+
+  return (primary ? entry.fieldValues[primary] : null) || form.name
+}
+
+/** A stored value as a number, or null where it is not one — blank included. */
+function toNumber(value: string | undefined): number | null {
+  const parsed = Number.parseFloat(value ?? "")
+
+  return Number.isNaN(parsed) ? null : parsed
 }

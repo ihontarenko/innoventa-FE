@@ -1,4 +1,4 @@
-import { createContext, useContext, type ReactNode } from "react"
+import { createContext, useContext, type ComponentProps, type ReactNode } from "react"
 import { EntityCard, EntityCardGrid } from "@jmouse/ui"
 import { useCardDensityStore } from "@/stores/cardDensityStore"
 
@@ -39,6 +39,7 @@ export function PageCard({
   onOpen,
   onDelete,
   confirmMessage,
+  navigation,
 }: {
   /** One letter or one emoji. Falls back to the name's initial at the call site, never to a placeholder. */
   icon: ReactNode
@@ -61,6 +62,8 @@ export function PageCard({
   onOpen?: () => void
   onDelete?: () => void
   confirmMessage?: string
+  /** `useListKeyboard`'s row properties, where this card is a row somebody navigates with `j`/`k`. */
+  navigation?: ComponentProps<typeof EntityCard>["navigation"]
 }) {
   const density = useCardDensityStore((state) => state.density)
   const hue = useContext(GroupHueContext)
@@ -83,6 +86,7 @@ export function PageCard({
       onOpen={onOpen}
       onRemove={onDelete}
       confirmLabel={confirmMessage}
+      navigation={navigation}
     />
   )
 }

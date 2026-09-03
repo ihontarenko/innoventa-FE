@@ -1,8 +1,7 @@
 import { useState } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, Skeleton } from "@jmouse/ui"
 import { fileLinks, type FileWithLink } from "@/api/files"
-import { useMyFiles } from "@/hooks/useFiles"
-import { useUploadDestination } from "@/components/form/UploadDestination"
+import { useMyFiles, type FolderRequest } from "@/hooks/useFiles"
 
 /**
  * Attaching a file the workspace already has.
@@ -15,16 +14,26 @@ const IMAGE_EXTENSIONS = /\.(jpe?g|png|gif|webp|svg|bmp)$/i
 
 export function ExistingFilePicker({
   acceptImages,
+  folder,
   onPick,
   onClose,
 }: {
   acceptImages: boolean
+  /**
+   * The same folder this field uploads INTO.
+   *
+   * ⚠️ **Handed down rather than derived again.** Both this and the uploader used to read the
+   * destination from context and work it out separately; now that a destination has shelves in it, two
+   * derivations are two chances to disagree — and the way that shows up is a file uploaded a moment ago
+   * being missing from the list that is supposed to offer it.
+   */
+  folder?: FolderRequest
   onPick: (file: FileWithLink) => void
   onClose: () => void
 }) {
   const [search, setSearch] = useState("")
-  // ⚠️ The same root uploads go to, so a file added a moment ago is offered here rather than missing.
-  const { data, isLoading } = useMyFiles(useUploadDestination())
+  // ⚠️ The same folder uploads go to, so a file added a moment ago is offered here rather than missing.
+  const { data, isLoading } = useMyFiles(folder)
 
   // ⚠️ Filtered in the browser, over one folder's contents. The paging controls went with INVT-0063:
   // this is a directory's contents now rather than a page of an account-wide query, and pretending to

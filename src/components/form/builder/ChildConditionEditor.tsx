@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { Zap } from "lucide-react"
-import { Button, Input, Popover, PopoverContent, PopoverTrigger, cn } from "@jmouse/ui"
+import { Button, Input, NativeSelect, Popover, PopoverContent, PopoverTrigger, cn } from "@jmouse/ui"
 import { fieldsApi } from "@/api/fields"
 import type { FieldCondition, FieldDetail, FieldSummary } from "@/types"
 
@@ -93,8 +93,8 @@ export function ChildConditionEditor({
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-1.5 text-xs">
             <span className="text-muted-foreground">When</span>
-            <select
-              className="h-8 rounded-md border bg-transparent px-1.5 text-xs"
+            <NativeSelect
+              size="sm"
               value={draft.triggerFieldName}
               onChange={(event) => setDraft({ ...draft, triggerFieldName: event.target.value })}
             >
@@ -105,10 +105,10 @@ export function ChildConditionEditor({
                   {sibling.usageType === "PHANTOM" ? " (chooser)" : ""}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
 
-            <select
-              className="h-8 rounded-md border bg-transparent px-1.5 font-mono text-xs"
+            <NativeSelect
+              size="sm" className="font-mono"
               value={draft.operator}
               onChange={(event) => setDraft({ ...draft, operator: event.target.value })}
             >
@@ -117,7 +117,7 @@ export function ChildConditionEditor({
                   {operator}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
 
             {needsValue && (
               <Input
@@ -129,8 +129,8 @@ export function ChildConditionEditor({
             )}
 
             <span className="text-muted-foreground">then</span>
-            <select
-              className="h-8 rounded-md border bg-transparent px-1.5 text-xs"
+            <NativeSelect
+              size="sm"
               value={draft.action}
               onChange={(event) => setDraft({ ...draft, action: event.target.value as FieldCondition["action"] })}
             >
@@ -139,7 +139,7 @@ export function ChildConditionEditor({
                   {action.label}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </div>
 
           {siblings.length === 0 && (

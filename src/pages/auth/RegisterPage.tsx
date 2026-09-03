@@ -10,7 +10,7 @@ import { problemDetailOf } from "@/lib/apiErrors"
  * Somebody creating an account, in whichever of the three arrangements this installation is in.
  *
  * ⚠️ **Open, invitation-only, or closed — and the screen is a different screen in each.** Those are read
- * from `/api/config`, which answers without a token precisely so this page can ask. An installation that
+ * from `/api/public/config`, which answers without a token precisely so this page can ask. An installation that
  * has closed registration and offers no invitations gets told so instead of a form that will be refused.
  */
 export function RegisterPage() {

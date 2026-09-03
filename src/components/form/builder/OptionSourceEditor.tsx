@@ -1,6 +1,5 @@
-import { Input, Textarea } from "@jmouse/ui"
+import { Input, NativeSelect, Textarea } from "@jmouse/ui"
 import {
-  IDENTITY_VALUE,
   OPTION_SOURCE_KEYS,
   STATIC_OPTION_SOURCE,
   parameterKey,
@@ -8,16 +7,16 @@ import {
   type OptionParameter,
 } from "@/api/optionSources"
 import { useOptionPreview, useOptionSourceDescriptors } from "@/hooks/useOptionSources"
+
 import type { useFieldDraft } from "./useFieldDraft"
 
 /**
  * Where a field's choices come from, and the parameters of whichever provider draws them.
  *
  * ⚠️ **Built from what the server says, and from nothing else.** `/option-sources` returns each
- * provider with its parameters **already typed** (`FORM`, `FIELD_OF`, `CHOICE`, `EXPRESSION`, …), so
- * this is a renderer over that answer rather than a hand-written panel per provider. A provider added
- * on the server appears here with working controls and no frontend change at all — which is the whole
- * reason the descriptor carries kinds.
+ * provider with its parameters already typed, so this is a renderer over that answer rather than a
+ * hand-written panel per provider. A provider added on the server appears here with working controls
+ * and no frontend change at all — which is the whole reason the descriptor carries kinds.
  *
  * ⚠️ **An unknown kind falls back to a text box.** The server may add one before this file knows it, and
  * that must cost a plainer control rather than a parameter nobody can set.
@@ -49,8 +48,7 @@ export function OptionSourceEditor({ editor }: { editor: ReturnType<typeof useFi
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1.5">
         <label className="text-xs font-medium">Where the choices come from</label>
-        <select
-          className="h-9 rounded-md border bg-transparent px-2 text-sm shadow-xs"
+        <NativeSelect
           value={source}
           onChange={(event) => {
             const next = event.target.value
@@ -71,7 +69,7 @@ export function OptionSourceEditor({ editor }: { editor: ReturnType<typeof useFi
               {candidate.label}
             </option>
           ))}
-        </select>
+        </NativeSelect>
 
         {isLoading && <span className="text-xs text-muted-foreground">Loading the providers…</span>}
         {descriptor && <span className="text-xs text-muted-foreground">{descriptor.description}</span>}
@@ -82,7 +80,6 @@ export function OptionSourceEditor({ editor }: { editor: ReturnType<typeof useFi
           key={parameter.name}
           parameter={parameter}
           value={parameters[parameter.name] ?? ""}
-          siblingValues={parameters}
           onChange={(value) => setConfig(parameterKey(parameter.name), value)}
         />
       ))}
@@ -116,27 +113,16 @@ export function OptionSourceEditor({ editor }: { editor: ReturnType<typeof useFi
   )
 }
 
-/**
- * One parameter, drawn as whatever kind the server said it is.
- *
- * ⚠️ **`FIELD_OF` and `KEY_FIELD` depend on another parameter** — the one naming the form whose fields
- * are the candidates. Until that one is set there is nothing to choose from, and saying so is better
- * than an empty dropdown that looks broken.
- */
+/** One parameter, drawn as whatever kind the server said it is. */
 function ParameterControl({
   parameter,
   value,
-  siblingValues,
   onChange,
 }: {
   parameter: OptionParameter
   value: string
-  siblingValues: Record<string, string>
   onChange: (value: string) => void
 }) {
-  const dependency = parameter.dependsOn ? siblingValues[parameter.dependsOn] : null
-  const isBlocked = !!parameter.dependsOn && !dependency
-
   return (
     <div className="flex flex-col gap-1.5">
       <label className="flex items-center gap-1.5 text-xs font-medium">
@@ -148,29 +134,11 @@ function ParameterControl({
         )}
       </label>
 
-      {parameter.kind === "CHOICE" ? (
-        <>
-          <select
-            className="h-9 rounded-md border bg-transparent px-2 text-sm shadow-xs"
-            value={value}
-            onChange={(event) => onChange(event.target.value)}
-          >
-            {!value && <option value="">— pick one</option>}
-            {parameter.choices.map((choice) => (
-              <option key={choice.value} value={choice.value}>
-                {choice.label}
-              </option>
-            ))}
-          </select>
-          {/* The consequence of the CHOSEN value, in the source's own words — this is the line that
-              stops somebody picking a mode and finding out later what it did. */}
-          {parameter.choices.find((choice) => choice.value === value)?.consequence && (
-            <span className="text-xs text-muted-foreground">
-              {parameter.choices.find((choice) => choice.value === value)?.consequence}
-            </span>
-          )}
-        </>
-      ) : parameter.kind === "EXPRESSION" ? (
+      {/* ⚠️ **Two controls, and it used to be five.** Pick a form, then one of its fields, then a mode —
+          each of those was a control the editor drew because a provider could not express the question
+          any other way. They are all one expression now, so what is left is the expression box and the
+          plain input every unknown kind degrades to. */}
+      {parameter.kind === "EXPRESSION" ? (
         <Textarea
           rows={2}
           className="font-mono text-xs"
@@ -178,14 +146,10 @@ function ParameterControl({
           value={value}
           onChange={(event) => onChange(event.target.value)}
         />
-      ) : isBlocked ? (
-        <span className="text-xs text-muted-foreground">
-          Set <strong>{parameter.dependsOn}</strong> first — its fields are what this chooses from.
-        </span>
       ) : (
         <Input
           className="font-mono text-xs"
-          placeholder={parameter.kind === "KEY_FIELD" ? IDENTITY_VALUE : parameter.kind.toLowerCase()}
+          placeholder={parameter.kind.toLowerCase()}
           value={value}
           onChange={(event) => onChange(event.target.value)}
         />

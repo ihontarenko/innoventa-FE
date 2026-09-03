@@ -9,12 +9,8 @@ import { FormLibraryPage } from "./FormLibraryPage"
 import { InspectionsPage } from "./InspectionsPage"
 import { InventoryPage } from "./InventoryPage"
 
-/**
- * ⚠️ Module-level so its identity is stable — it reaches a query key, and an array literal rebuilt on
- * every render is a new key on every render.
- */
-const CATALOG_COMPANIONS = ["CAD"]
 import { LocationsPage } from "./LocationsPage"
+import { MovementsPage } from "./MovementsPage"
 import { PagesPage } from "./PagesPage"
 import { PeoplePage } from "./PeoplePage"
 import { ProjectsPage } from "./ProjectsPage"
@@ -23,6 +19,7 @@ import { MaintenancePage } from "./MaintenancePage"
 import { ResultsPage } from "./ResultsPage"
 import { ParametricSearchPage } from "./ParametricSearchPage"
 import { SearchPage } from "./SearchPage"
+import { StocktakesPage } from "./StocktakesPage"
 import { SynonymsPage } from "./SynonymsPage"
 import { ToolsPage } from "./ToolsPage"
 import { WatchPage } from "./WatchPage"
@@ -45,8 +42,13 @@ export const SCREENS: Record<string, ComponentType> = {
   "component-types": ComponentTypesPage,
   fields: FieldsPage,
   forms: FormLibraryPage,
-  inventory: InventoryPage,
+  // ⚠️ Mounted with its own section name — see `ownSection` on the component: the third face broke the
+  // derivation that used to work it out, and a door then led back to the screen you were on.
+  inventory: () => <InventoryPage ownSection="inventory" />,
   locations: LocationsPage,
+  // ⚠️ The register, and the Activity feed is the other thing — see MovementsPage. One screen, two
+  // readings, rather than two menu entries for what is nearly the same list.
+  movements: MovementsPage,
   // ⚠️ This product's own store, read with the ordinary session. It was a window onto another product
   // for a while; it is not any more, and only the anonymous public manual still comes from there.
   pages: PagesPage,
@@ -56,6 +58,9 @@ export const SCREENS: Record<string, ComponentType> = {
   projects: ProjectsPage,
   lookup: LookupPage,
   results: ResultsPage,
+  // ⚠️ The sheet itself is a route rather than a section — `/stocktakes/:id`. A section is a place in
+  // the menu; one sheet is a record, and records have their own addresses here.
+  stocktakes: StocktakesPage,
   "parametric-search": ParametricSearchPage,
   search: SearchPage,
   "value-synonyms": SynonymsPage,
@@ -75,18 +80,20 @@ export const SCREENS: Record<string, ComponentType> = {
   // ⚠️ The same component, a different purpose — and deliberately not the same screen. Stock counts what
   // is on the shelf; the catalogue records what a part *is*, whether or not one is in a drawer.
   //
-  // ⚠️ **Two catalogues, one entry.** Parts, and the drawings those parts are placed as — told apart by
-  // the type rail this screen already had, rather than by a second item in the menu. A menu that grows
-  // an entry for every kind of thing stops being a menu, and the two are looked up together anyway: the
-  // question "which footprint does this take" starts on the part.
-  catalog: () => (
-    <InventoryPage
-      purposeCode="CATALOG"
-      companionPurposeCodes={CATALOG_COMPANIONS}
-      title="Catalogs"
-      noun="part"
-    />
-  ),
+  // ⚠️ **Parts only now — the drawings moved out to `cad` below.** This carried both behind one menu
+  // entry called *Catalogs*, a plural that honestly covered them. Once the entry became *Parts*, the
+  // label promised a screen about parts and hid the drawings behind it; and a drawing had by then grown
+  // its own workbench, so the two were no longer one question asked about two kinds of thing.
+  //
+  // ⚠️ `companionPurposeCodes` is gone rather than emptied: it widens the type rail, and widening it
+  // here is exactly what would put the drawings back on a screen that no longer says it has them.
+  catalog: () => <InventoryPage purposeCode="CATALOG" title="Parts" noun="part" ownSection="catalog" />,
+
+  // ⚠️ The same component, a different purpose — which is the whole reason it takes one. A drawing is an
+  // entry of a `CAD` form exactly as a part is an entry of a `CATALOG` one, so the screen that lists
+  // parts lists drawings without knowing what either is; what differs is the rail, the columns the forms
+  // declare, and the workbench a drawing opens.
+  cad: () => <InventoryPage purposeCode="CAD" title="CAD" noun="drawing" ownSection="cad" />,
 }
 
 /** Which domain ticket owns which section — the same split the epic's table describes. */

@@ -1,17 +1,16 @@
 import {
+  ArrowLeftRight,
   Bot,
   BookOpen,
   Boxes,
   Bug,
+  FileCode,
   Building2,
   Home,
   KeyRound,
   Landmark,
   ListChecks,
   Mail,
-  Palette,
-  PencilRuler,
-  Route,
   ScrollText,
   Settings,
   Share2,
@@ -23,7 +22,7 @@ import {
 } from "lucide-react"
 
 /**
- * The menu outside a workspace, and the two screens that menu now leads to.
+ * The menu outside a workspace, and the screen that menu now leads to.
  *
  * ⚠️ **Innoventa's navigation is three menus, not one.** The platform context is a list because
  * nothing gates it but permissions the token already carries; the *workspace* menu turns on which
@@ -116,8 +115,8 @@ export interface NavigationSection {
  *
  * ⚠️ **Its entries keep their own addresses, and the screen imposes no prefix.** `Purposes` lives at
  * `/purposes` because purposes are installation-wide and the address was deliberately kept out of
- * `LEGACY_SPACE_SECTIONS`; the Mapping builder is at `/admin/mapping` though it belongs to the
- * Workbench. A screen here is a grouping of destinations, never a route they have to live under.
+ * `LEGACY_SPACE_SECTIONS`, yet it is on the Administration rail. A screen here is a grouping of
+ * destinations, never a route they have to live under.
  */
 export interface NavigationScreen {
   key: string
@@ -221,6 +220,19 @@ const ADMINISTRATION: NavigationScreen = {
           isBuilt: true,
         },
         {
+          key: "exchange-rates",
+          path: "/admin/exchange-rates",
+          label: "Exchange rates",
+          description: "What a currency is worth, and how old that answer is",
+          icon: ArrowLeftRight,
+          // ⚠️ `settings:read`, not a money permission of its own. The base currency is a system setting
+          // behind `settings:write`, so a separate permission here would make an administrator who may
+          // choose to total in dollars and may not sync the dollar rate that makes it work.
+          requiredPermission: "settings:read",
+          requiredEverywhere: true,
+          isBuilt: true,
+        },
+        {
           key: "sharing",
           path: "/admin/shares",
           label: "Sharing",
@@ -277,51 +289,19 @@ const ADMINISTRATION: NavigationScreen = {
   ],
 }
 
-const WORKBENCH: NavigationScreen = {
-  key: "workbench",
-  path: "/workbench",
-  label: "Workbench",
-  // The sentence anything proposed for this screen has to answer to — without it the Workbench becomes
-  // the drawer everything that fits nowhere else ends up in.
-  description: "The tools that describe the product itself, rather than the data an installation holds",
-  // ⚠️ **Not `Wrench`, for the same reason it is not called Tools:** that icon and that word already
-  // name a *workspace* section, and one name resolving to two places depending on which navigation
-  // context is open is how a product acquires a vocabulary nobody can use out loud.
-  icon: PencilRuler,
-  groups: [
-    {
-      key: "workbench-tools",
-      items: [
-        {
-          // ⚠️ **No permission, deliberately.** The kit discloses nothing — it is the shared vocabulary
-          // for talking about this interface, and gating it would mean the person describing a screen
-          // and the person building it could not name the same part.
-          key: "ui-kit",
-          path: "/ui-kit",
-          label: "jMouse UI",
-          description: "Every part this interface is built from — what we call it, and where it comes from",
-          icon: Palette,
-          isBuilt: true,
-        },
-        {
-          key: "mapping-builder",
-          path: "/admin/mapping",
-          label: "Mapping builder",
-          description: "Compose a .jmm document from a form, and read back what the server makes of it",
-          icon: Route,
-          // ⚠️ `settings:write` rather than a read permission, and it matches what the backend declares
-          // for the library's controller. The catalogue behind this screen is every class name and every
-          // property in the installation — a description of the product's shape, not read-level data.
-          requiredPermission: "settings:write",
-          requiredEverywhere: true,
-          isBuilt: true,
-        },
-      ],
-    },
-  ],
-}
-
-export const navigationScreens: NavigationScreen[] = [ADMINISTRATION, WORKBENCH]
+/**
+ * ⚠️ **There was a second screen here — the Workbench — and it was removed rather than emptied.**
+ *
+ * It held the UI kit, the mapping builder and the validation documents under the sentence *"the tools
+ * that describe the product itself"*. That sentence was written to stop the screen becoming a drawer,
+ * and it did not: two of the three were a showcase and a screen opened once a year, and the third
+ * already had a sidebar row of its own for the frequency reason below. A menu whose every entry is
+ * reached faster another way is a level of navigation charging rent it does not earn.
+ *
+ * ⚠️ So `navigationScreens` is a list of one, deliberately — the mechanism is right and there is
+ * currently one screen using it. A second is added by writing it, not by reviving this comment.
+ */
+export const navigationScreens: NavigationScreen[] = [ADMINISTRATION]
 
 export function screenItems(screen: NavigationScreen): NavigationItem[] {
   return screen.groups.flatMap((group) => group.items)
@@ -404,8 +384,52 @@ export const platformSections: NavigationSection[] = [
         portedBy: "INVT-0055",
         isBuilt: true,
       },
+      /**
+       * ⚠️ **A row here as well as a tile on the Workbench, and by the same rule as the audit log
+       * above: frequency, not category.**
+       *
+       * It is configuration by any definition and belongs on the Workbench by category. But the rules a
+       * record is judged by are edited while somebody is in the middle of building a form — they are
+       * opened *during* work rather than once at setup, and reaching them meant leaving for the
+       * Workbench and finding the tile.
+       *
+       * ⚠️ Its store is installation-wide — one document may judge many forms (`INVT-0299`) — which is
+       * why it is here rather than in any workspace's own menu.
+       */
+      {
+        key: "validation-documents",
+        path: "/admin/validation",
+        label: "Validation documents",
+        icon: ShieldCheck,
+        // The same permission the backend declares for the library's controllers: the listing names
+        // every document in the installation.
+        requiredPermission: "settings:write",
+        requiredEverywhere: true,
+        isBuilt: true,
+      },
+      /**
+       * ⚠️ **Beside the validation documents, and directly below them on purpose.**
+       *
+       * The two answer adjacent questions about the same moment — *what is valid* and *what should
+       * happen* — and somebody who has just written a rule refusing a quantity is the person about to
+       * ask what should follow from one. Filing them apart would leave the second discoverable only to
+       * whoever already knew it existed.
+       *
+       * ⚠️ Its store, unlike validation's, is **per workspace**: a script belongs to the workspace it
+       * is written in, and switching workspace switches the documents. The permission is nevertheless
+       * installation-wide, because a script is code that runs inside every entry write — see
+       * `ScriptDocumentController` for why those two facts sit together.
+       */
+      {
+        key: "scripts",
+        path: "/admin/scripts",
+        label: "Scripts",
+        icon: FileCode,
+        requiredPermission: "settings:write",
+        requiredEverywhere: true,
+        isBuilt: true,
+      },
       screenRow(ADMINISTRATION),
-      screenRow(WORKBENCH),
     ],
   },
 ]

@@ -13,6 +13,9 @@ import { EntryDatasheetLinkView, EntryImageView } from "@/components/entry/Entry
 import { hasValue, readEntryCapabilities } from "@/components/entry/entryCapabilities"
 import { EntryDetailsList, EntryIdentityCard } from "@/components/form/EntryRecord"
 import { EntryWidgets } from "@/components/form/EntryWidgets"
+import { MovementsPane } from "@/components/inventory/MovementsPane"
+import { WantedByProjectsPane } from "@/components/inventory/WantedByProjectsPane"
+import { WhereItIsPane } from "@/components/inventory/WhereItIsPane"
 import { readFormConfigs } from "@/lib/formConfigs"
 import type { FormDetail, FormEntry } from "@/types"
 
@@ -92,6 +95,30 @@ export function EntryDossier({
   const tabs: Array<{ key: string; label: string; count?: number }> = [
     { key: "relations", label: "Related" },
   ]
+
+  /* ⚠️ **A part gets "where it is"; a position does not.** A catalogue part carries no quantity and is
+     held in as many boxes as it likes, so where it is has to be summed from elsewhere. A position IS
+     one of those boxes and already says where it is in its own fields — a tab about it would be the
+     same fact twice. */
+  const isPart = capabilities.purposeCode === "CATALOG"
+
+  if (isPart) {
+    tabs.push({ key: "where", label: "Where it is" })
+  }
+
+  /* ⚠️ **Both of them, because the question is the same one from two doors.** A position answers it
+     through the part it holds — two boxes of the same component both satisfy the same line, so asking
+     of the box and asking of the part must not give different answers. */
+  if (isPart || capabilities.stock) {
+    tabs.push({ key: "projects", label: "In projects" })
+  }
+
+  /* ⚠️ **Only where the record counts something**, which is the same test the stock panel uses. A
+     catalogue part has no quantity, so it has no history of one — and a tab promising a journal that
+     can never have a row in it is worse than no tab. */
+  if (capabilities.stock) {
+    tabs.push({ key: "movements", label: "Movements" })
+  }
 
   if (hasDatasheetFile) {
     tabs.push({ key: "datasheet", label: "Datasheet" })
@@ -196,6 +223,17 @@ export function EntryDossier({
               <EntryRelatedPanel entry={entry} purposeCode={capabilities.purposeCode} />
             </div>
           )}
+
+          {current === "where" && <WhereItIsPane partId={entry.id} />}
+
+          {current === "projects" && (
+            <WantedByProjectsPane
+              catalogEntryId={isPart ? entry.id : undefined}
+              positionEntryId={isPart ? undefined : entry.id}
+            />
+          )}
+
+          {current === "movements" && <MovementsPane entryId={entry.id} />}
 
           {current === "datasheet" && capabilities.datasheet && (
             <EntryDocumentPane entry={entry} datasheet={capabilities.datasheet} />

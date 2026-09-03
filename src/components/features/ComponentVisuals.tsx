@@ -83,8 +83,13 @@ const SMD_COLOURS: Record<SmdFormat, { body: string; text: string; pad: string; 
 }
 
 /**
- * ⚠️ **A `null` code is drawn dimmed with a dash, never hidden.** "This value has no three-digit
+ * ⚠️ **A `null` code is drawn as an unmarked chip, never hidden.** "This value has no three-digit
  * marking" is a fact worth seeing beside the two that do — a missing chip reads as a rendering fault.
+ *
+ * ⚠️ **The body keeps its full paint and the glyph keeps its size; only the marking goes faint.** The
+ * chip used to be drawn at `opacity: 0.4` with a smaller dash, and on a dark theme that put its body
+ * within a few values of the card behind it — leaving two pads and a hole, which reads as a chip that
+ * shrank rather than a chip nobody printed a code on.
  */
 export function SmdResistor({
   code,
@@ -98,17 +103,24 @@ export function SmdResistor({
   width?: number
 }) {
   const colours = SMD_COLOURS[format]
+  const isUnmarked = code === null
   const shown = code ?? "–"
-  const isDim = code === null
   const fontSize = shown.length <= 3 ? 20 : shown.length === 4 ? 17 : 14
 
   return (
     <span className="flex flex-col items-center gap-1">
-      <svg viewBox="0 0 140 70" width={width} height={(width / 140) * 70} role="img" aria-label={label ?? format}>
+      <svg
+        viewBox="0 0 140 70"
+        width={width}
+        height={(width / 140) * 70}
+        className="shrink-0"
+        role="img"
+        aria-label={label ?? format}
+      >
         <rect x="0" y="4" width="22" height="62" rx="3" fill={colours.pad} />
         <rect x="0" y="4" width="6" height="62" rx="3" fill={colours.sheen} opacity="0.55" />
 
-        <rect x="17" y="4" width="106" height="62" rx="6" fill={colours.body} opacity={isDim ? 0.4 : 1} />
+        <rect x="17" y="4" width="106" height="62" rx="6" fill={colours.body} />
         <rect x="17" y="4" width="106" height="12" rx="6" fill="rgba(255,255,255,0.05)" />
 
         <rect x="118" y="4" width="22" height="62" rx="3" fill={colours.pad} />
@@ -119,8 +131,9 @@ export function SmdResistor({
           y="36"
           textAnchor="middle"
           dominantBaseline="middle"
-          fill={isDim ? "#666" : colours.text}
-          fontSize={isDim ? 13 : fontSize}
+          fill={isUnmarked ? colours.pad : colours.text}
+          fillOpacity={isUnmarked ? 0.45 : 1}
+          fontSize={fontSize}
           fontFamily="monospace"
           fontWeight="700"
           letterSpacing="1.5"

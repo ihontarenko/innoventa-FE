@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Button, Input } from "@jmouse/ui"
+import { Button, Input, NativeSelect } from "@jmouse/ui"
 import type { FieldCondition, FieldDetail, FormDetail } from "@/types"
 import { useClearFieldCondition, useSetFieldCondition } from "@/hooks/useForms"
 import { EditorField, EditorSection } from "../EditorSection"
@@ -60,8 +60,7 @@ export function ConditionSection({
     <EditorSection title="Condition" icon="⚡" badge={condition ? "set" : undefined} defaultOpen={!!condition}>
       <div className="grid grid-cols-[auto_1fr] items-center gap-2 text-xs">
         <span className="text-muted-foreground">When</span>
-        <select
-          className="h-9 rounded-md border bg-transparent px-2 text-sm shadow-xs"
+        <NativeSelect
           value={draft.triggerFieldName}
           onChange={(event) => setDraft({ ...draft, triggerFieldName: event.target.value })}
         >
@@ -71,12 +70,12 @@ export function ConditionSection({
               {candidate.label}
             </option>
           ))}
-        </select>
+        </NativeSelect>
 
         <span className="text-muted-foreground">is</span>
         <div className="flex gap-2">
-          <select
-            className="h-9 rounded-md border bg-transparent px-2 font-mono text-xs shadow-xs"
+          <NativeSelect
+            className="font-mono"
             value={draft.operator}
             onChange={(event) => setDraft({ ...draft, operator: event.target.value })}
           >
@@ -85,7 +84,7 @@ export function ConditionSection({
                 {operator}
               </option>
             ))}
-          </select>
+          </NativeSelect>
 
           {needsValue && (
             <Input
@@ -98,8 +97,7 @@ export function ConditionSection({
         </div>
 
         <span className="text-muted-foreground">then</span>
-        <select
-          className="h-9 rounded-md border bg-transparent px-2 text-sm shadow-xs"
+        <NativeSelect
           value={draft.action}
           onChange={(event) => setDraft({ ...draft, action: event.target.value as FieldCondition["action"] })}
         >
@@ -108,7 +106,7 @@ export function ConditionSection({
               {action.label}
             </option>
           ))}
-        </select>
+        </NativeSelect>
       </div>
 
       <EditorField

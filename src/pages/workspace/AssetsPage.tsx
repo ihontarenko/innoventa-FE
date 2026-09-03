@@ -1,31 +1,25 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   Badge,
   Button,
-  cn,
+  DetailsPanel,
   type FilterItem,
-  FilterPanel,
-  Input,
-  Row,
-  RowList,
-  RowMeta,
-  RowTitle,
-  Skeleton,
+  useDetailsPanel,
 } from "@jmouse/ui"
-import { PageHeader } from "@/components/PageHeader"
-import { Pagination } from "@/components/Pagination"
-import { ToggleChip } from "@/components/ToggleChip"
+import { DataTable } from "@/components/layout/DataTable"
+import { ListScreen } from "@/components/layout/ListScreen"
 import { ViewBar } from "@/components/ViewBar"
-import { AssetDrawer } from "@/components/custody/AssetDrawer"
+import { AssetPanel } from "@/components/custody/AssetPanel"
 import { RegisterAssetDialog } from "@/components/custody/RegisterAssetDialog"
 import { ScanDialog } from "@/components/custody/ScanDialog"
 import { useAssetForms, useAssets } from "@/hooks/useCustody"
-import { QueryPanel, type AppliedQuery } from "@jmouse/query"
+import { QueryPanel } from "@jmouse/query"
 import { assetsOf } from "@/components/query/subjects"
 import { QUERY_LABELS } from "@/components/query/labels"
 import { useMaintenanceBoard } from "@/hooks/useMonitoring"
 import { capitalised, useTerm } from "@/hooks/useTerminology"
 import { useViewFromAddress } from "@/hooks/useViewFromAddress"
+import { useAddress } from "@/hooks/useAddress"
 import type { DueState } from "@/api/monitoring"
 import { custodyApi } from "@/api/custody"
 import { LabelPrintButton } from "@/components/labels/LabelPrintButton"
@@ -33,9 +27,7 @@ import { LABEL_RUN_PROBE } from "@/lib/labels/labelPrinting"
 import { useDebouncedValue } from "@/hooks/useDebouncedValue"
 import { relativeMoment } from "@/lib/dates"
 import type { Asset, AssetFilter, AssetState } from "@/api/custody"
-
 const PAGE_SIZE = 25
-
 /**
  * The four states a thing can be in.
  *
@@ -49,12 +41,10 @@ const STATES: Array<{ value: AssetState; glyph: string; label: string; what: str
   { value: "IN_SERVICE", glyph: "🔧", label: "In service", what: "Came back needing attention." },
   { value: "WRITTEN_OFF", glyph: "✕", label: "Written off", what: "Off the books for good." },
 ]
-
 const STATE_GLYPHS = Object.fromEntries(STATES.map((state) => [state.value, state.glyph])) as Record<
   AssetState,
   string
 >
-
 /**
  * What the workspace holds, and who has it right now.
  *
@@ -66,21 +56,49 @@ const STATE_GLYPHS = Object.fromEntries(STATES.map((state) => [state.value, stat
  * state would mean the states no longer partition the board, and every count would stop adding up.
  */
 export function AssetsPage() {
-  const [page, setPage] = useState(0)
-  const [state, setState] = useState<AssetState | undefined>(undefined)
-  const [formId, setFormId] = useState<string | undefined>(undefined)
-  const [overdueOnly, setOverdueOnly] = useState(false)
-  const [typed, setTyped] = useState("")
-  const [openAssetId, setOpenAssetId] = useState<string | null>(null)
+  /**
+   * Every narrowing this board applies — **in the address**.
+   *
+   * <h2>⚠️ All of it lived in `useState`, so the board had one address for every view of it</h2>
+   *
+   * <p>*The overdue instruments, page two* was not something anybody could link to, keep open in a second
+   * tab, or return to after opening a record: leaving and coming back landed on the unfiltered first page
+   * with nothing to say a filter had been dropped. Ivan asked for the opposite in as many words — the
+   * filters that are not a saved view still belong in the URL.
+   *
+   * <p>Transient things stay state: which panel is open, whether the scanner is up, what is half-typed.
+   * The rule is whether somebody could reasonably send it to somebody else.
+   */
+  const { parameters, amend, query: jmq, setQuery: setJmq } = useAddress()
+  const page = Math.max(0, Number(parameters.get("page") ?? "1") - 1)
+  const state = (parameters.get("state") as AssetState | null) ?? undefined
+  const formId = parameters.get("form") ?? undefined
+  const overdueOnly = parameters.get("overdue") === "1"
+  const setPage = (next: number) => amend({ page: next <= 0 ? null : String(next + 1) })
+  const setState = (next: AssetState | undefined) => amend({ state: next ?? null, page: null })
+  const setFormId = (next: string | undefined) => amend({ form: next ?? null, page: null })
+  const setOverdueOnly = (next: boolean) => amend({ overdue: next ? "1" : null, page: null })
+  /* ⚠️ **The same peek Inventory opens, not a modal sheet.** It was a `Sheet` that dimmed the list
+     behind it while Inventory showed the same kind of thing as a third full-height column — the exact
+     difference Ivan pointed an arrow at. `useDetailsPanel` decides column-or-overlay by width, so a
+     phone still gets a sheet and a desktop never does. */
+  const peek = useDetailsPanel<string>()
   const [registering, setRegistering] = useState(false)
   const [scanning, setScanning] = useState(false)
   const [activeViewId, setActiveViewId] = useState<string | null>(null)
-  const [jmq, setJmq] = useState<AppliedQuery>({})
   const [composing, setComposing] = useState(false)
-
+  /**
+   * ⚠️ **What is typed stays local; what is SEARCHED goes to the address.** Writing every keystroke into
+   * the URL puts a history entry behind each letter and re-renders the address bar as somebody types.
+   */
+  const [typed, setTyped] = useState(parameters.get("q") ?? "")
   // ⚠️ Debounced because this one is a *server* filter — a request per keystroke against a paged board.
   const query = useDebouncedValue(typed.trim(), 300)
-
+  useEffect(() => {
+    if (query !== (parameters.get("q") ?? "")) {
+      amend({ q: query || null, page: null })
+    }
+  }, [query])
   const filter: AssetFilter = useMemo(
     () => ({
       state,
@@ -90,12 +108,9 @@ export function AssetsPage() {
     }),
     [state, formId, overdueOnly, query],
   )
-
   const { data, isLoading } = useAssets(filter, page, PAGE_SIZE, jmq)
   const { data: assetForms = [] } = useAssetForms()
-
   const assets = data?.content ?? []
-
   /**
    * ⚠️ **Half of what a thing's state is was invisible here.** The row painted *due back* — custody's
    * question — while an excavator forty hours past its oil change looked exactly like one serviced
@@ -106,12 +121,10 @@ export function AssetsPage() {
    * this is the one call the Maintenance screen already makes and react-query already holds.
    */
   const watch = useWatchStateByAsset()
-
   // What this workspace calls them. The English is the fallback and is what paints before the words land.
   const term = useTerm()
   const things = term("thing.many", "things")
   const thing = term("thing.one", "thing")
-
   useViewFromAddress<AssetFilter & { query?: string }>("assets", (applied, viewId) => {
     setState(applied.state)
     setFormId(applied.formId)
@@ -120,7 +133,6 @@ export function AssetsPage() {
     setPage(0)
     setActiveViewId(viewId)
   })
-
   const filterItems: FilterItem[] = [
     ...STATES.map((one) => ({ key: `state:${one.value}`, icon: one.glyph, label: one.label })),
     ...assetForms.map((form, index) => ({
@@ -130,70 +142,56 @@ export function AssetsPage() {
       dividerLabel: index === 0 ? "Kind" : undefined,
     })),
   ]
-
   const activeKey = state ? `state:${state}` : formId ? `form:${formId}` : null
-
   function choose(key: string | null) {
     setPage(0)
     // ⚠️ Narrowing by hand un-claims the view: the filter is no longer what it stored.
     setActiveViewId(null)
-
     if (!key) {
       setState(undefined)
       setFormId(undefined)
-
       return
     }
-
     if (key.startsWith("state:")) {
       setState(key.slice(6) as AssetState)
       setFormId(undefined)
-
       return
     }
-
     setFormId(key.slice(5))
     setState(undefined)
   }
-
   return (
     <>
-      <PageHeader
+      <ListScreen
         title={capitalised(things)}
         description={`${data?.totalElements ?? 0} ${things} — where they are and who has them`}
-        actions={
+        search={{
+          value: typed,
+          placeholder: `Search ${things}… ( / )`,
+          onChange: (value) => {
+            setTyped(value)
+            setPage(0)
+            setActiveViewId(null)
+          },
+        }}
+        chips={[
+          { label: "Filter", active: composing, onClick: () => setComposing((previous) => !previous) },
+          {
+            label: "Overdue",
+            active: overdueOnly,
+            title: "Only things that were due back already",
+            onClick: () => {
+              setOverdueOnly(!overdueOnly)
+              setPage(0)
+              setActiveViewId(null)
+            },
+          },
+        ]}
+        action={{ label: `Register ${thing}`, onClick: () => setRegistering(true) }}
+        extraActions={
           <>
-            <ToggleChip active={composing} onClick={() => setComposing((previous) => !previous)}>
-              Filter
-            </ToggleChip>
-
-            <ToggleChip
-              active={overdueOnly}
-              title="Only things that were due back already"
-              onClick={() => {
-                setOverdueOnly((previous) => !previous)
-                setPage(0)
-                setActiveViewId(null)
-              }}
-            >
-              Overdue
-            </ToggleChip>
-
-            <Input
-              size="sm"
-              className="w-64"
-              value={typed}
-              placeholder={`Search everything about a ${thing}…`}
-              onChange={(event) => {
-                setTyped(event.target.value)
-                setPage(0)
-                setActiveViewId(null)
-              }}
-            />
-
             {/* ⚠️ Batch is by FILTER, not by selection — the filters already on this screen answer
-                "which forty", so this is one button rather than forty checkboxes. It draws itself only
-                where a design exists for the chosen form, so it is absent rather than a dead end. */}
+                "which forty", so this is one button rather than forty checkboxes. */}
             <LabelPrintButton
               formId={formId}
               permission="custody:read"
@@ -202,60 +200,42 @@ export function AssetsPage() {
                 const whole = await custodyApi
                   .assets(0, LABEL_RUN_PROBE, filter)
                   .then((response) => response.data)
-
                 return whole.content.map((asset) => asset.id)
               }}
             />
-
             {/* ⚠️ Beside the search rather than instead of it: a scan is one more way to select a
                 thing, never a second flow. What it resolves to opens the drawer everything else
                 opens. */}
             <Button size="sm" variant="outline" onClick={() => setScanning(true)}>
               Scan
             </Button>
-
-            <Button size="sm" onClick={() => setRegistering(true)}>
-              Register a {thing}
-            </Button>
           </>
         }
-      />
-
-      {/*
-        ⚠️ Below the header rather than in a drawer: a filter somebody is composing and the rows it will
-        narrow belong on one screen. A panel that covered the list would make every adjustment a guess.
-
-        ⚠️ The form is passed as it is CHOSEN, so choosing one widens the vocabulary to that form's
-        fields and choosing none leaves the asset's own facts — which is the useful answer here rather
-        than a degraded one, because equipment spans several forms.
-      */}
-      {composing && (
-        <QueryPanel
-          subject={assetsOf(formId)}
-          query={jmq}
-          labels={QUERY_LABELS}
-          placeholder="asset[state] == 'AVAILABLE'"
-          onApply={(applied) => {
-            setJmq(applied)
-            setPage(0)
-            setActiveViewId(null)
-          }}
-        />
-      )}
-
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[15rem_minmax(0,1fr)]">
-        <FilterPanel
-          title="State"
-          items={filterItems}
-          activeKey={activeKey}
-          onSelect={choose}
-          allLabel="Everything"
-          allIcon="☰"
-          allCount={data?.totalElements}
-          searchable={filterItems.length > 8}
-        />
-
-        <div className="flex min-w-0 flex-col gap-3">
+        banner={
+          composing ? (
+            <QueryPanel
+              subject={assetsOf(formId)}
+              query={jmq}
+              labels={QUERY_LABELS}
+              placeholder="asset[state] == 'AVAILABLE'"
+              onApply={(applied) => {
+                setJmq(applied)
+                setPage(0)
+                setActiveViewId(null)
+              }}
+            />
+          ) : undefined
+        }
+        rail={{
+          title: "State",
+          items: filterItems,
+          activeKey: activeKey,
+          onSelect: choose,
+          allLabel: "Everything",
+          allIcon: "☰",
+          allCount: data?.totalElements,
+        }}
+        toolbar={
           <ViewBar
             section="assets"
             filter={{ state, formId, overdue: overdueOnly, query: typed }}
@@ -270,61 +250,131 @@ export function AssetsPage() {
               setActiveViewId(viewId)
             }}
           />
-
-          {isLoading && assets.length === 0 ? (
-            <Skeleton className="h-64 w-full" />
-          ) : assets.length === 0 ? (
-            <div className="flex flex-col items-center gap-1.5 rounded-md border border-dashed px-6 py-10 text-center">
-              <span aria-hidden="true" className="text-2xl">
-                🧰
-              </span>
-              <span className="text-sm font-medium">No {things} yet</span>
-              <span className="max-w-md text-xs text-muted-foreground">
-                An asset is a *particular* thing — this meter, that programmer — tracked by who has it
-                rather than by how many there are. Register one to start.
-              </span>
-            </div>
-          ) : (
-            <>
-              <RowList>
-                {assets.map((asset) => (
-                  <AssetRow
-                    key={asset.id}
-                    asset={asset}
-                    watch={watch.get(asset.id)}
-                    onOpen={() => setOpenAssetId(asset.id)}
-                  />
-                ))}
-              </RowList>
-
-              {data && data.totalPages > 1 && (
-                <Pagination
-                  page={page}
-                  totalPages={data.totalPages}
-                  totalElements={data.totalElements}
-                  size={data.size}
-                  onChange={setPage}
-                />
-              )}
-            </>
-          )}
-        </div>
-      </div>
-
-      {openAssetId && <AssetDrawer assetId={openAssetId} onClose={() => setOpenAssetId(null)} />}
-
+        }
+        loading={isLoading && assets.length === 0}
+        isEmpty={assets.length === 0}
+        empty={{
+          title: `No ${things} yet`,
+          text: `A ${thing} is a *particular* object — this meter, that programmer — tracked by who has it rather than by how many there are. Register one to start.`,
+          actions: [{ label: `Register ${thing}`, primary: true, onClick: () => setRegistering(true) }],
+        }}
+        pagination={
+          data
+            ? {
+                page,
+                totalPages: data.totalPages,
+                totalElements: data.totalElements,
+                size: data.size,
+                onChange: setPage,
+              }
+            : undefined
+        }
+        /* ⚠️ **A peek, as the third column** — the same one Inventory opens, so the two screens behave
+            alike. The title comes from the row where the row is on this page, and from the panel's own
+            fetch where it is not: the scanner resolves an identifier, and the thing it names may be on
+            page four. */
+        detail={{
+          open: Boolean(peek.subject) && !peek.narrow,
+          node: peek.subject && (
+            <DetailsPanel
+              state={peek}
+              title={assets.find((asset) => asset.id === peek.subject)?.label ?? capitalised(thing)}
+              description={
+                assets.find((asset) => asset.id === peek.subject)?.holderLabel ??
+                assets.find((asset) => asset.id === peek.subject)?.locationPath ??
+                "Where it is, and who has had it."
+              }
+            >
+              <AssetPanel assetId={peek.subject} />
+            </DetailsPanel>
+          ),
+        }}
+      >
+        <DataTable
+          rows={assets}
+          rowKey={(asset) => asset.id}
+          onRowClick={(asset) => peek.show(asset.id)}
+          rowClassName={(asset) =>
+            isAlarming(asset, watch.get(asset.id))
+              ? "border-l-2 border-l-destructive bg-destructive/5"
+              : undefined
+          }
+          columns={[
+            {
+              key: "label",
+              header: capitalised(thing),
+              className: "max-w-72 truncate font-medium",
+              cell: (asset) => (
+                <span className="flex items-center gap-1.5">
+                  <span aria-hidden="true">{STATE_GLYPHS[asset.state]}</span>
+                  {asset.label}
+                </span>
+              ),
+            },
+            {
+              key: "where",
+              header: "Where it is",
+              className: "text-muted-foreground max-w-64 truncate",
+              /* ⚠️ Whichever of the two is filled in — a thing is with somebody *or* somewhere. */
+              cell: (asset) => asset.holderLabel ?? asset.locationPath ?? "nowhere in particular",
+            },
+            {
+              key: "form",
+              header: "Kind",
+              className: "text-muted-foreground",
+              cell: (asset) => asset.formName,
+            },
+            {
+              key: "reading",
+              header: "Reading",
+              align: "right",
+              cell: (asset) => {
+                const summary = watch.get(asset.id)
+                return summary?.currentValue
+                  ? `${summary.currentValue}${summary.metricUnit ? ` ${summary.metricUnit}` : ""}`
+                  : "—"
+              },
+            },
+            {
+              key: "standing",
+              header: "Standing",
+              /* ⚠️ **Both kinds of late land in one column, and they are different facts.** `overdue`
+                 is *not brought back*; an alarming watch state is *not serviced* or *reading wrong*.
+                 Somebody scanning asks "which of these wants me", not which mechanism said so. */
+              cell: (asset) => {
+                const summary = watch.get(asset.id)
+                const alarming = summary?.state === "OVERDUE" || summary?.state === "OUT_OF_RANGE"
+                return (
+                  <span className="flex flex-wrap items-center gap-1">
+                    {asset.overdue && <Badge variant="destructive">overdue</Badge>}
+                    {asset.dueAt && !asset.overdue && (
+                      <Badge variant="outline">due {relativeMoment(asset.dueAt)}</Badge>
+                    )}
+                    {summary && summary.state !== "OK" && (
+                      <Badge variant={alarming ? "destructive" : "outline"} title={summary.planName}>
+                        {WATCH_WORDS[summary.state]}
+                      </Badge>
+                    )}
+                    {!asset.overdue && !asset.dueAt && (!summary || summary.state === "OK") && (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </span>
+                )
+              },
+            },
+          ]}
+        />
+      </ListScreen>
       {registering && <RegisterAssetDialog onClose={() => setRegistering(false)} />}
-
       {scanning && (
         <ScanDialog
           onResolved={(resolution) => {
             setScanning(false)
-
             // A resolved thing opens the drawer every other route into it opens. A resolved PLACE is
             // deliberately not handled here — it belongs to the locations screen, and inventing a
             // second place view on the assets page is the parallel flow this whole design refuses.
             if (resolution.kind === "asset" && resolution.subjectId) {
-              setOpenAssetId(resolution.subjectId)
+              peek.show(resolution.subjectId)
             }
           }}
           onClose={() => setScanning(false)}
@@ -333,7 +383,6 @@ export function AssetsPage() {
     </>
   )
 }
-
 /**
  * The worst thing every rule says about each thing, indexed by thing.
  *
@@ -343,13 +392,10 @@ export function AssetsPage() {
  */
 function useWatchStateByAsset(): Map<string, WatchSummary> {
   const { data: rows = [] } = useMaintenanceBoard({})
-
   return useMemo(() => {
     const worst = new Map<string, WatchSummary>()
-
     for (const row of rows) {
       const standing = worst.get(row.assetId)
-
       if (!standing || CONCERN.indexOf(row.answer.state) > CONCERN.indexOf(standing.state)) {
         worst.set(row.assetId, {
           state: row.answer.state,
@@ -359,67 +405,27 @@ function useWatchStateByAsset(): Map<string, WatchSummary> {
         })
       }
     }
-
     return worst
   }, [rows])
 }
-
 /** The backend's own order of concern, so the two never disagree about which answer wins. */
 const CONCERN = ["OK", "STALE", "DUE_SOON", "OVERDUE", "OUT_OF_RANGE"] as const
-
 interface WatchSummary {
   state: DueState
   planName: string
   currentValue: string | null
   metricUnit: string | null
 }
-
-function AssetRow({
-  asset,
-  watch,
-  onOpen,
-}: {
-  asset: Asset
-  watch: WatchSummary | undefined
-  onOpen: () => void
-}) {
-  // ⚠️ Both kinds of late paint the row, and they are different facts: `overdue` is *not brought back*,
-  // an alarming watch state is *not serviced* or *reading wrong*. One stripe either way, because what
-  // somebody is scanning for is "which of these wants me", not which mechanism said so.
-  const alarming = watch?.state === "OVERDUE" || watch?.state === "OUT_OF_RANGE"
-
-  return (
-    <Row
-      onOpen={onOpen}
-      className={cn((asset.overdue || alarming) && "border-l-2 border-l-destructive bg-destructive/5")}
-      leading={<span aria-hidden="true">{STATE_GLYPHS[asset.state]}</span>}
-      trailing={
-        <>
-          {asset.overdue && <Badge variant="destructive">overdue</Badge>}
-          {asset.dueAt && !asset.overdue && (
-            <Badge variant="outline">due {relativeMoment(asset.dueAt)}</Badge>
-          )}
-          {watch && watch.state !== "OK" && (
-            <Badge variant={alarming ? "destructive" : "outline"} title={watch.planName}>
-              {WATCH_WORDS[watch.state]}
-            </Badge>
-          )}
-          <Badge variant="secondary">{asset.formName}</Badge>
-        </>
-      }
-    >
-      <RowTitle>{asset.label}</RowTitle>
-      {/* ⚠️ Whichever of the two is filled in — a thing is with somebody *or* somewhere, never both. */}
-      <RowMeta>
-        {asset.holderLabel ?? asset.locationPath ?? "nowhere in particular"}
-        {watch?.currentValue
-          ? ` · ${watch.currentValue}${watch.metricUnit ? ` ${watch.metricUnit}` : ""}`
-          : ""}
-      </RowMeta>
-    </Row>
-  )
+/**
+ * Whether a row wants somebody's attention — either kind of late.
+ *
+ * ⚠️ **Two different facts, one stripe.** `overdue` is *not brought back*; an alarming watch state is
+ * *not serviced* or *reading wrong*. Whoever scans this board is asking "which of these wants me", not
+ * which mechanism said so — so the row is marked either way and the column keeps the two words apart.
+ */
+function isAlarming(asset: Asset, watch: WatchSummary | undefined) {
+  return asset.overdue || watch?.state === "OVERDUE" || watch?.state === "OUT_OF_RANGE"
 }
-
 /**
  * ⚠️ **Said in the words somebody staffing a store uses**, not in the enum's. `STALE` is the state that
  * exists so *nobody has written a number down* stops looking like *nothing is due*, and calling it
@@ -432,5 +438,4 @@ const WATCH_WORDS: Record<DueState, string> = {
   OVERDUE: "service overdue",
   OUT_OF_RANGE: "reading out of range",
 }
-
 export { STATES as ASSET_STATES, STATE_GLYPHS as ASSET_STATE_GLYPHS }

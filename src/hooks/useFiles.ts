@@ -15,16 +15,16 @@ import {
  * link is a Sharing Center row rather than a property of a file — so the list comes from one and the
  * links from the other, in one request for the whole page rather than one per row.
  */
-export function useMyFiles(rootName?: string) {
+export function useMyFiles(folder?: FolderRequest) {
   return useQuery<FileWithLink[]>({
-    queryKey: ["files", "mine", rootName ?? "cabinet"],
+    queryKey: ["files", "mine", folder ? [folder.name, folder.type, folder.kind] : "cabinet"],
     queryFn: async () => {
       /*
         ⚠️ **The root has to match where uploads go, or "choose existing" cannot see them.** Once a
         feature's uploads land in their own root, a picker still listing the cabinet shows everything
         except the files somebody just added — which reads as the upload having failed.
       */
-      const directory = rootName ? await folderId(rootName) : await cabinetId()
+      const directory = folder ? await folderId(folder) : await cabinetId()
 
       const files = await filesApi
         .list(fileOwner.directory(directory))
@@ -66,15 +66,15 @@ export function useUploadFile() {
        * ⚠️ **Which named root this belongs in** — `inventory`, `cad`. Resolved on the server, which
        * creates it on first ask, so nothing here has to know a path.
        */
-      rootName?: string
+      folder?: FolderRequest
       onProgress?: (percent: number) => void
     }
   >({
-    mutationFn: async ({ file, directoryId, rootName, onProgress }) => {
+    mutationFn: async ({ file, directoryId, folder, onProgress }) => {
       // ⚠️ A file has to go SOMEWHERE — the library files against an owner, and there is no such thing
       // as an unfiled file. An explicit folder wins; a named root is what a feature's own form asks for;
       // and the cabinet is the last answer, for a fill that belongs to no feature at all.
-      const destination = directoryId ?? (rootName ? await folderId(rootName) : await cabinetId())
+      const destination = directoryId ?? (folder ? await folderId(folder) : await cabinetId())
 
       const stored = await filesApi
         .upload(fileOwner.directory(destination), file, onProgress)
@@ -117,23 +117,39 @@ export function useImportFile() {
  */
 const folderIds = new Map<string, Promise<string>>()
 
-export function folderId(name: string): Promise<string> {
-  const known = folderIds.get(name)
+/** Where one kind of file belongs: an allow-listed root, and up to two shelves inside it. */
+export interface FolderRequest {
+  name: string
+  /** Which type the file is about — `Resistor`. */
+  type?: string
+  /** What sort of file it is — `Datasheets`, `Images`. */
+  kind?: string
+}
+
+/**
+ * ⚠️ **The whole request is the memo key, not the root name.** Keyed on the name alone, the second
+ * type to upload anything would be handed the first type's folder id — and the file would land in
+ * somebody else's shelf while every screen said it went where it was asked to.
+ */
+export function folderId(request: FolderRequest): Promise<string> {
+  const key = [request.name, request.type ?? '', request.kind ?? ''].join('/')
+  const known = folderIds.get(key)
+
   if (known) {
     return known
   }
 
   const asked = filesApi
-    .folder(name)
+    .folder(request.name, { type: request.type, kind: request.kind })
     .then((response) => response.data.id)
     .catch((failure) => {
       // ⚠️ A failed lookup must not be remembered as the answer — the next upload would inherit a
       // rejected promise for the rest of the session and fail for a reason that is long gone.
-      folderIds.delete(name)
+      folderIds.delete(key)
       throw failure
     })
 
-  folderIds.set(name, asked)
+  folderIds.set(key, asked)
   return asked
 }
 

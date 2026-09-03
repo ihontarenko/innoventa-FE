@@ -103,17 +103,27 @@ export function useToggleMaterialExcluded() {
   )
 }
 
-export function useLinkStockEntry() {
-  return useMaterialMutation(
-    ({ projectId, materialId, stockEntryId }: { projectId: string; materialId: string; stockEntryId: string }) =>
-      projectsApi.linkStockEntry(projectId, materialId, stockEntryId).then((response) => response.data),
-  )
-}
+/**
+ * Take the components of every fully covered line off the shelf.
+ *
+ * ⚠️ **The shelf changes, so everything about stock is invalidated too.** An issue moves quantities in
+ * several boxes at once; leaving the stock caches alone would show the project as issued while the
+ * inventory screen behind it still counts what was taken.
+ */
+export function useIssueCoveredLines() {
+  const queryClient = useQueryClient()
 
-export function useUnlinkStockEntry() {
-  return useMaterialMutation(({ projectId, materialId }: { projectId: string; materialId: string }) =>
-    projectsApi.unlinkStockEntry(projectId, materialId).then((response) => response.data),
-  )
+  return useMutation({
+    mutationFn: (projectId: string) =>
+      projectsApi.issueCoveredLines(projectId).then((response) => response.data),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: PROJECT_KEYS.all })
+      void queryClient.invalidateQueries({ queryKey: ["stock"] })
+      void queryClient.invalidateQueries({ queryKey: ["stock-summary"] })
+      void queryClient.invalidateQueries({ queryKey: ["entries"] })
+      void queryClient.invalidateQueries({ queryKey: ["attention"] })
+    },
+  })
 }
 
 export function useLinkCatalogEntry() {

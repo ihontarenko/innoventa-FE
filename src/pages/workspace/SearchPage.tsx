@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { Badge, type FilterItem, FilterPanel, Input, Row, RowList, RowMeta, RowTitle, Skeleton } from "@jmouse/ui"
-import { PageHeader } from "@/components/PageHeader"
-import { Pagination } from "@/components/Pagination"
+import { Badge, type FilterItem, Row, RowList, RowMeta, RowTitle } from "@jmouse/ui"
+import { ListScreen } from "@/components/layout/ListScreen"
+import { SearchModes } from "@/components/search/SearchModes"
 import { MINIMUM_QUERY_LENGTH, useSearch, useSearchTypes } from "@/hooks/useSearch"
 import { normalizeValueForUI } from "@/lib/fieldValues"
 import { spaceSectionPath } from "@/lib/navigationContext"
@@ -67,95 +67,74 @@ export function SearchPage() {
   const activeDescriptor = descriptors.find((descriptor) => descriptor.type === activeType)
 
   return (
-    <>
-      <PageHeader
-        title="Search"
-        description={isReady ? `${total} across ${activeDescriptor?.label.toLowerCase() ?? "everything"}` : "Forms, fields, entries, pages"}
-        actions={
-          <Input
-            autoFocus
-            className="h-8 w-80 text-sm"
-            value={query}
-            placeholder="Search everything…"
-            onChange={(event) => put("q", event.target.value)}
-          />
-        }
-      />
+    <ListScreen
+      title="Search"
+      description={
+        isReady
+          ? `${total} across ${activeDescriptor?.label.toLowerCase() ?? "everything"}`
+          : "Forms, fields, entries, pages"
+      }
+      search={{ value: query, onChange: (value) => put("q", value), placeholder: "Search everything…" }}
+      banner={<SearchModes />}
+      rail={{
+        title: "Kind",
+        items: filterItems,
+        activeKey: activeType,
+        onSelect: (key) => put("type", key),
+        allLabel: "Everything",
+        allIcon: "⌕",
+      }}
+      loading={isReady && isFetching && hits.length === 0}
+      /* ⚠️ **Two different nothings, and they must not read alike.** Too short a query is a state the
+          person can leave by typing; no match is an answer. Folding them into one empty state would
+          tell somebody who has typed one letter that they own nothing. */
+      isEmpty={!isReady || hits.length === 0}
+      empty={
+        !isReady
+          ? {
+              title: "Type a little more",
+              text: `At least ${MINIMUM_QUERY_LENGTH} characters — one letter matches most of what you own, which is the slowest and least useful answer there is.`,
+            }
+          : {
+              title: "Nothing matches",
+              text: `Nothing answers to “${query}”${activeDescriptor ? ` among ${activeDescriptor.label.toLowerCase()}` : ""}. Try fewer words, or widen the kind.`,
+            }
+      }
+      pagination={
+        data
+          ? {
+              page,
+              totalPages: data.totalPages,
+              totalElements: data.totalElements,
+              size: data.size,
+              onChange: setPage,
+            }
+          : undefined
+      }
+    >
+      <div className="p-4">
+        <RowList>
+          {hits.map((hit) => {
+            const descriptor = descriptors.find((one) => one.type === hit.type)
+            const href = spaceSlug ? addressOf(hit, spaceSlug) : null
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[15rem_minmax(0,1fr)]">
-        <FilterPanel
-          title="Kind"
-          items={filterItems}
-          activeKey={activeType}
-          onSelect={(key) => put("type", key)}
-          allLabel="Everything"
-          allIcon="⌕"
-        />
-
-        <div className="flex min-w-0 flex-col gap-3">
-          {!isReady ? (
-            <Hint
-              glyph="⌕"
-              title="Type a little more"
-              detail={`At least ${MINIMUM_QUERY_LENGTH} characters — one letter matches most of what you own, which is the slowest and least useful answer there is.`}
-            />
-          ) : isFetching && hits.length === 0 ? (
-            <Skeleton className="h-64 w-full" />
-          ) : hits.length === 0 ? (
-            <Hint
-              glyph="📭"
-              title="Nothing matches"
-              detail={`Nothing answers to “${query}”${activeDescriptor ? ` among ${activeDescriptor.label.toLowerCase()}` : ""}. Try fewer words, or widen the kind.`}
-            />
-          ) : (
-            <>
-              <RowList>
-                {hits.map((hit) => {
-                  const descriptor = descriptors.find((one) => one.type === hit.type)
-                  const href = spaceSlug ? addressOf(hit, spaceSlug) : null
-
-                  return (
-                    <Row
-                      key={`${hit.type}-${hit.id}`}
-                      onOpen={href ? () => navigate(href) : undefined}
-                      leading={<span aria-hidden="true">{descriptor?.icon ?? "•"}</span>}
-                      trailing={descriptor ? <Badge variant="outline">{descriptor.label}</Badge> : undefined}
-                    >
-                      {/* ⚠️ An entry's title is a stored *value* and goes through the normaliser, or a
-                          composite reads as `22|pF` in the one list somebody scans fastest. */}
-                      <RowTitle>{hit.type === "entry" ? normalizeValueForUI(hit.title) : hit.title}</RowTitle>
-                      {hit.subtitle && <RowMeta>{hit.subtitle}</RowMeta>}
-                    </Row>
-                  )
-                })}
-              </RowList>
-
-              {data && data.totalPages > 1 && (
-                <Pagination
-                  page={page}
-                  totalPages={data.totalPages}
-                  totalElements={data.totalElements}
-                  size={data.size}
-                  onChange={setPage}
-                />
-              )}
-            </>
-          )}
-        </div>
+            return (
+              <Row
+                key={`${hit.type}-${hit.id}`}
+                onOpen={href ? () => navigate(href) : undefined}
+                leading={<span aria-hidden="true">{descriptor?.icon ?? "•"}</span>}
+                trailing={descriptor ? <Badge variant="outline">{descriptor.label}</Badge> : undefined}
+              >
+                {/* ⚠️ An entry's title is a stored *value* and goes through the normaliser, or a
+                    composite reads as `22|pF` in the one list somebody scans fastest. */}
+                <RowTitle>{hit.type === "entry" ? normalizeValueForUI(hit.title) : hit.title}</RowTitle>
+                {hit.subtitle && <RowMeta>{hit.subtitle}</RowMeta>}
+              </Row>
+            )
+          })}
+        </RowList>
       </div>
-    </>
-  )
-}
-
-function Hint({ glyph, title, detail }: { glyph: string; title: string; detail: string }) {
-  return (
-    <div className="flex flex-col items-center gap-1.5 rounded-md border border-dashed px-6 py-10 text-center">
-      <span aria-hidden="true" className="text-2xl">
-        {glyph}
-      </span>
-      <span className="text-sm font-medium">{title}</span>
-      <span className="max-w-md text-xs text-muted-foreground">{detail}</span>
-    </div>
+    </ListScreen>
   )
 }
 

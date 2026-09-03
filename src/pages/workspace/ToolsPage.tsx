@@ -3,16 +3,14 @@ import {
   Badge,
   Button,
   type FilterItem,
-  FilterPanel,
   Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
-  cn,
 } from "@jmouse/ui"
 import { CardGroup, PageCard } from "@/components/PageCard"
-import { PageHeader } from "@/components/PageHeader"
+import { ListScreen } from "@/components/layout/ListScreen"
 import { CardDensityToggle } from "@/components/CardDensityToggle"
 import { groupHues } from "@/lib/groupHues"
 import { aggregatorFeatures, toolFeatures } from "@/components/features/registry"
@@ -97,69 +95,55 @@ export function ToolsPage() {
 
   return (
     <>
-      <PageHeader
+      <ListScreen
         title="Tools"
         description={`${items.length} instruments — each doing something an expression cannot`}
-        actions={<CardDensityToggle />}
-      />
-
-      {/* ⚠️ Two tabs only when there is a shelf, and they are NOT the same kind of thing wearing one
-          coat: the left are code in this repository, the right are documents in Kiwi. They sit together
-          because somebody looking for a calculator looks in one place, and apart because only one of
-          them can be changed by editing this product. */}
-      {shelf.data && (
-        <div className="flex gap-1 border-b pb-2">
-          {[
-            { key: "instruments", label: "Instruments", count: items.length },
-            { key: "shelf", label: shelf.data.name, count: undefined },
-          ].map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setOnShelf(tab.key === "shelf")}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-sm transition-colors",
-                onShelf === (tab.key === "shelf")
-                  ? "bg-accent font-medium"
-                  : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
-              )}
-            >
-              {tab.label}
-              {tab.count !== undefined && <span className="ml-1.5 text-xs opacity-60">{tab.count}</span>}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {onShelf && shelf.data ? (
-        <ReferenceShelf shelf={shelf.data} />
-      ) : (
-
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[15rem_minmax(0,1fr)]">
-        <FilterPanel
-          title="Kind"
-          items={filterItems}
-          activeKey={activeCategory}
-          onSelect={setActiveCategory}
-          allLabel="Everything"
-          allIcon="🧰"
-          allCount={items.length}
-        />
-
-        <div className="flex min-w-0 flex-col gap-5">
-          {items.length === 0 ? (
-            <div className="flex flex-col items-center gap-1.5 rounded-md border border-dashed px-6 py-10 text-center">
-              <span aria-hidden="true" className="text-2xl">
-                🧰
-              </span>
-              <span className="text-sm font-medium">No tools</span>
-              <span className="max-w-md text-xs text-muted-foreground">
-                Nothing is registered. A tool is code rather than configuration, so this is a deployment
-                question rather than a workspace one.
-              </span>
-            </div>
-          ) : (
-            groups.map((group) => (
+        /* ⚠️ Two chips only when there IS a shelf, and they are NOT the same kind of thing wearing one
+            coat: the left are code in this repository, the right are documents in Kiwi. They sit
+            together because somebody looking for a calculator looks in one place, and apart because
+            only one of them can be changed by editing this product. */
+        chips={
+          shelf.data
+            ? [
+                {
+                  label: "Instruments",
+                  count: items.length,
+                  active: !onShelf,
+                  onClick: () => setOnShelf(false),
+                },
+                { label: shelf.data.name, active: onShelf, onClick: () => setOnShelf(true) },
+              ]
+            : []
+        }
+        extraActions={<CardDensityToggle />}
+        /* ⚠️ No rail on the shelf: its documents are not filed by the instruments' kinds, and a rail
+            whose facets narrow nothing on screen is a control that lies about what it does. */
+        rail={
+          onShelf
+            ? undefined
+            : {
+                title: "Kind",
+                items: filterItems,
+                activeKey: activeCategory,
+                onSelect: setActiveCategory,
+                allLabel: "Everything",
+                allIcon: "🧰",
+                allCount: items.length,
+              }
+        }
+        isEmpty={!onShelf && items.length === 0}
+        empty={{
+          title: "No tools",
+          text: "Nothing is registered. A tool is code rather than configuration, so this is a deployment question rather than a workspace one.",
+        }}
+      >
+        {onShelf && shelf.data ? (
+          <div className="p-4">
+            <ReferenceShelf shelf={shelf.data} />
+          </div>
+        ) : (
+          <div className="flex flex-col gap-5 p-4">
+            {groups.map((group) => (
               <CardGroup
                 key={group.category}
                 title={CATEGORY_LABELS[group.category] ?? group.category}
@@ -181,7 +165,9 @@ export function ToolsPage() {
                       description={description}
                       chips={
                         <>
-                          {item.entry.kind === "aggregator" && <Badge variant="outline">reads every entry</Badge>}
+                          {item.entry.kind === "aggregator" && (
+                            <Badge variant="outline">reads every entry</Badge>
+                          )}
                           {/* ⚠️ Worth saying: a tool with no catalogue row still works, and somebody
                               wondering why it is missing from an admin list deserves the reason. */}
                           {!item.row && <Badge variant="outline">not catalogued</Badge>}
@@ -197,12 +183,10 @@ export function ToolsPage() {
                   )
                 })}
               </CardGroup>
-            ))
-          )}
-        </div>
-      </div>
-
-      )}
+            ))}
+          </div>
+        )}
+      </ListScreen>
 
       {open && !onShelf && (
         <ToolSheet

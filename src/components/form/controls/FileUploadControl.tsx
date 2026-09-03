@@ -4,7 +4,7 @@ import { Button, ImageCropperDialog, cn, isCroppableImage } from "@jmouse/ui"
 import { composeFileFieldValue, fileLinks, parseFileFieldValue } from "@/api/files"
 import { cropSpecificationFor, imageProcessingOf } from "@/lib/imageProcessing"
 import { useUploadFile } from "@/hooks/useFiles"
-import { useUploadDestination } from "@/components/form/UploadDestination"
+import { shelfFor, useUploadDestination } from "@/components/form/UploadDestination"
 import { usePublicConfiguration } from "@/hooks/useSystemSettings"
 import { ExistingFilePicker } from "./ExistingFilePicker"
 import type { ControlProperties } from "./types"
@@ -30,9 +30,15 @@ export function FileUploadControl({ field, value, onChange, hasError, acceptImag
   const { data: publicConfig } = usePublicConfiguration()
   const uploadFile = useUploadFile()
 
-  // ⚠️ Where this form.s uploads belong. Undefined for a form that belongs to no feature — a public
+  // ⚠️ Where this form's uploads belong. Undefined for a form that belongs to no feature — a public
   // fill, a one-off — and that keeps landing in the cabinet exactly as it always did.
-  const rootName = useUploadDestination()
+  //
+  // ⚠️ The SHELF is per field, not per form: a datasheet and a photograph of the same resistor are two
+  // kinds of file about one thing, and one folder holding both is the flat folder this replaced.
+  const destination = useUploadDestination()
+  const folder = destination
+    ? { name: destination.rootName, type: destination.type, kind: shelfFor(field, destination) }
+    : undefined
 
   const [progress, setProgress] = useState<number | null>(null)
   const [error, setError] = useState("")
@@ -55,8 +61,16 @@ export function FileUploadControl({ field, value, onChange, hasError, acceptImag
   // handed, so a fresh object every render is a frame that never settles.
   const cropSpecification = useMemo(
     () => (cropping ? cropSpecificationFor(processing, cropping) : undefined),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the picture and the four values are the identity here
-    [cropping, processing.maxWidth, processing.maxHeight, processing.format, processing.quality],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the picture and these values are the identity here
+    [
+      cropping,
+      processing.maxWidth,
+      processing.maxHeight,
+      processing.format,
+      processing.quality,
+      processing.ratios,
+      processing.reshape,
+    ],
   )
 
   const reference = parseFileFieldValue(value)
@@ -70,7 +84,7 @@ export function FileUploadControl({ field, value, onChange, hasError, acceptImag
 
     try {
       const file = blob instanceof File ? blob : new File([blob], name, { type: blob.type || "image/jpeg" })
-      const uploaded = await uploadFile.mutateAsync({ file, rootName, onProgress: setProgress })
+      const uploaded = await uploadFile.mutateAsync({ file, folder, onProgress: setProgress })
 
       if (!uploaded.viewToken) {
         setError("That upload has no public link, so it cannot be attached here.")
@@ -237,6 +251,7 @@ export function FileUploadControl({ field, value, onChange, hasError, acceptImag
 
       {isPicking && (
         <ExistingFilePicker
+          folder={folder}
           acceptImages={acceptImages}
           onClose={() => setPicking(false)}
           onPick={(file) => {

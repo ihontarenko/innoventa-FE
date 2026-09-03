@@ -6,7 +6,7 @@ export interface PriceBreak {
 }
 
 /** One distributor's answer about one part. ⚠️ Almost every field is nullable — providers differ. */
-export interface PricingOffer {
+export interface LookupOffer {
   partNumber: string | null
   manufacturer: string | null
   description: string | null
@@ -25,10 +25,10 @@ export interface PricingOffer {
   priceBreaks: PriceBreak[]
 }
 
-export interface PricingResult {
+export interface LookupResult {
   query: string
   provider: string
-  offers: PricingOffer[]
+  offers: LookupOffer[]
 }
 
 /**
@@ -39,11 +39,11 @@ export interface PricingResult {
  * sentence rather than "search failed" — the first is actionable and the second sends somebody to check
  * their spelling.
  */
-export const pricingApi = {
+export const lookupApi = {
   search: (provider: string, query: string) =>
-    http.get<PricingResult>(`/pricing/${provider}`, { params: { query } }),
+    http.get<LookupResult>(`/lookup/${provider}`, { params: { query } }),
 
   /** The same question asked about a row already held, so the part number comes from the entry. */
   searchByEntry: (entryId: string, provider: string) =>
-    http.get<PricingResult>(`/entries/${entryId}/pricing/${provider}`),
+    http.get<LookupResult>(`/entries/${entryId}/lookup/${provider}`),
 }

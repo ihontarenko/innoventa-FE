@@ -86,7 +86,7 @@ export interface AuditModuleOption {
  * Facet options declared by the backend registry — complete before any matching event exists.
  *
  * @property silentModules modules that deliberately record nothing — expression evaluation, search,
- *           pricing lookups, developer tooling. Listed so their absence from the log reads as a
+ *           supplier lookups, developer tooling. Listed so their absence from the log reads as a
  *           decision rather than as a recording path somebody forgot to write, which is otherwise the
  *           same thing to look at.
  */

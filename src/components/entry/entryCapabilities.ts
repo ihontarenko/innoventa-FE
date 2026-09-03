@@ -32,7 +32,7 @@ const PART_PURPOSES = new Set(["INVENTORY", "CATALOG"])
  * `datasheet_url`; the convention exists whether or not this file reads it. Requiring the configuration
  * instead was tried first and is why the shipped `bjt` type — which has `quantity`,
  * `min_stock_threshold`, `datasheet_url`, `datasheet_file`, `approximate_price` and `buy_url`, and
- * declares none of them under `stock.*` or `pricing.*` — drew an empty rail beside a full record.
+ * declares none of them under `stock.*` or `catalogue.*` — drew an empty rail beside a full record.
  *
  * ⚠️ **The fallback only ever fires against a field that EXISTS**, so a workspace that renamed one gets
  * the same nothing it gets today rather than a panel about a field that is not there. Configuration
@@ -62,6 +62,7 @@ const IMAGE_URL_FIELDS = new Set(["image_url", "photo_url", "picture_url"])
 
 export interface StockCapability {
   quantity: FieldDetail
+  /** ⚠️ The least worth keeping IN THIS PLACE, compared with this row's quantity and never with a total. */
   threshold: FieldDetail | null
   location: FieldDetail | null
 }
@@ -162,6 +163,9 @@ export function readEntryCapabilities(form: FormDetail): EntryCapabilities {
   const stock = quantity
     ? {
         quantity: claim(quantity),
+        /* ⚠️ **Per POSITION — the least worth keeping in this place.** Not a total across every drawer
+           the part sits in: a position with three of something is low here even when the next drawer
+           along holds two hundred, and saying so is the point. */
         threshold: claim(
           fieldFor(form, byName, FORM_CONFIG_KEYS.STOCK_THRESHOLD_FIELD, CONVENTIONAL_FIELDS.threshold),
         ),
@@ -175,7 +179,17 @@ export function readEntryCapabilities(form: FormDetail): EntryCapabilities {
       }
     : null
 
-  const price = isPart ? fieldFor(form, byName, PRICING_CONFIG_KEYS.PRICE_FIELD, CONVENTIONAL_FIELDS.price) : null
+  /* ⚠️ **Two prices, two questions, and the form decides which one it is asking.** On a part it is what
+     one costs to buy — an indication, for something nobody may hold yet. On a position it is what this
+     batch actually cost, which is what a shelf is valued at. Same field, different key, deliberately. */
+  const price = isPart
+    ? fieldFor(
+        form,
+        byName,
+        purposeCode === "INVENTORY" ? FORM_CONFIG_KEYS.STOCK_PRICE_FIELD : PRICING_CONFIG_KEYS.PRICE_FIELD,
+        CONVENTIONAL_FIELDS.price,
+      )
+    : null
 
   /* ⚠️ The buy address belongs to Supply, beside the price it is the address FOR — and is therefore not
      offered again under Links. Two homes for one address is what made the tab read as a duplicate. */

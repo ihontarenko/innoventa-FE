@@ -9,14 +9,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   type FilterItem,
-  FilterPanel,
-  Input,
-  Skeleton,
 } from "@jmouse/ui"
 import { MoreHorizontal } from "lucide-react"
 import { CardGroup, PageCard } from "@/components/PageCard"
 import { LevelDoor } from "@/components/LevelDoor"
-import { PageHeader } from "@/components/PageHeader"
+import { ListScreen } from "@/components/layout/ListScreen"
 import { ViewBar } from "@/components/ViewBar"
 import { CardDensityToggle } from "@/components/CardDensityToggle"
 import { EntryFormDialog } from "@/components/form/EntryFormDialog"
@@ -30,15 +27,27 @@ import { useViewFromAddress } from "@/hooks/useViewFromAddress"
 import { useSpaceStore } from "@/stores/spaceStore"
 import type { SpaceForm } from "@/api/spaces"
 
-/** The purpose that makes a form a component type. ⚠️ Branch on the code, never on a form's id. */
-const INVENTORY = "INVENTORY"
+/**
+ * The purpose that makes a form a component type. ⚠️ Branch on the code, never on a form's id.
+ *
+ * ⚠️ **`CATALOG`, and it used to be `INVENTORY`.** When the two purposes swapped roles, the forty-four
+ * typed descriptions — resistor, diode, MOSFET — became the *catalogue*, and `INVENTORY` was left
+ * holding exactly one form: the schema of a box on a shelf. This screen went on asking for `INVENTORY`
+ * and so listed that one form, calling a storage schema a component type.
+ *
+ * ⚠️ **The two purposes now name two different ideas, and the string looks the same in both.** Nothing
+ * in the compiler can tell "the types of thing this workspace stocks" from "how a position is
+ * recorded", so every screen naming a purpose has to say which of the two it means. This one means the
+ * kinds of component.
+ */
+const COMPONENT_TYPE_PURPOSE = "CATALOG"
 
 const UNCATEGORISED = "uncategorised"
 
 /**
  * The component types this workspace counts.
  *
- * ⚠️ **A "component type" is a form with the `INVENTORY` purpose** — the same object the form library
+ * ⚠️ **A "component type" is a form with the `CATALOG` purpose** — the same object the form library
  * lists, seen from the side that matters here. Two screens over one thing, deliberately: the library is
  * about *schemas*, this is about *what this workspace stocks*, and somebody arriving at one is not
  * looking for the other.
@@ -51,7 +60,7 @@ export function ComponentTypesPage() {
   const navigate = useNavigate()
   const spaceSlug = useSpaceStore((state) => state.activeSpaceSlug)
 
-  const { data: types = [], isLoading } = useWorkspaceForms(INVENTORY)
+  const { data: types = [], isLoading } = useWorkspaceForms(COMPONENT_TYPE_PURPOSE)
 
   const [search, setSearch] = useState("")
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null)
@@ -113,99 +122,82 @@ export function ComponentTypesPage() {
 
   return (
     <>
-      <PageHeader
+      <ListScreen
         title="Component types"
         description={`${types.length} in this workspace`}
-        actions={
-          <>
-            <Input
-              className="h-8 w-56 text-sm"
-              value={search}
-              placeholder="Search types…"
-              onChange={(event) => setSearch(event.target.value)}
-            />
-            <CardDensityToggle />
-            <Button size="sm" onClick={() => setCreating(true)}>
-              New type
-            </Button>
-          </>
-        }
-      />
-
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[15rem_minmax(0,1fr)]">
-        <FilterPanel
-          title="Category"
-          items={filterItems}
-          activeKey={activeCategoryId}
-          onSelect={(key) => {
+        search={{ value: search, onChange: setSearch, placeholder: "Search types…" }}
+        extraActions={<CardDensityToggle />}
+        action={{ label: "New type", onClick: () => setCreating(true) }}
+        rail={{
+          title: "Category",
+          items: filterItems,
+          activeKey: activeCategoryId,
+          onSelect: (key) => {
             setActiveCategoryId(key)
             // Narrowing by hand un-claims the view.
             setActiveViewId(null)
-          }}
-          allLabel="All types"
-          allCount={types.length}
-          searchable={filterItems.length > 8}
-        />
-
-        <div className="flex min-w-0 flex-col gap-5">
-          <ViewBar
-            section="component-types"
-            filter={{ categoryId: activeCategoryId, search }}
-            isFiltered={Boolean(activeCategoryId || search.trim())}
-            activeViewId={activeViewId}
-            onApply={(applied, viewId) => {
-              setActiveCategoryId(applied.categoryId ?? null)
-              setSearch(applied.search ?? "")
-              setActiveViewId(viewId)
-            }}
-          />
-
-          {isLoading ? (
-            <Skeleton className="h-64 w-full" />
-          ) : visible.length === 0 ? (
-            <div className="flex flex-col items-center gap-1.5 rounded-md border border-dashed px-6 py-10 text-center">
-              <span aria-hidden="true" className="text-2xl">
-                ◫
-              </span>
-              <span className="text-sm font-medium">
-                {types.length === 0 ? "No component types yet" : "Nothing matches"}
-              </span>
-              <span className="max-w-md text-xs text-muted-foreground">
-                {types.length === 0
-                  ? "A component type is a form this workspace stocks things against — its fields are what a row of stock records."
-                  : "No type in this workspace answers to that."}
-              </span>
-            </div>
-          ) : (
-            groups.map((group) => (
-              <CardGroup
-                key={group.id}
-                title={group.name}
-                icon={group.icon}
-                count={group.forms.length}
-                hue={hueOfGroup.get(group.id)}
-              >
-                {group.forms.map((form) => (
-                  <TypeCard
-                    key={form.id}
-                    form={form}
-                    onOpenSchema={() => spaceSlug && navigate(spaceSectionPath(spaceSlug, `forms/${form.id}`))}
-                    onAddEntry={() => setOpenFormId(form.id)}
-                    onManage={() => setManagedTypeId(form.id)}
-                    onPreview={() => setPreviewTypeId(form.id)}
-                    onDelete={() =>
-                      deleteForm.mutate(form.id, {
-                        onSuccess: () => toast.success(`${form.name} deleted.`),
-                        onError: () => toast.error("Could not delete this type."),
-                      })
-                    }
-                  />
-                ))}
-              </CardGroup>
-            ))
-          )}
+          },
+          allLabel: "All types",
+          allCount: types.length,
+          searchable: filterItems.length > 8,
+        }}
+        banner={
+          <div className="shrink-0 border-b px-4 py-2">
+            <ViewBar
+              section="component-types"
+              filter={{ categoryId: activeCategoryId, search }}
+              isFiltered={Boolean(activeCategoryId || search.trim())}
+              activeViewId={activeViewId}
+              onApply={(applied, viewId) => {
+                setActiveCategoryId(applied.categoryId ?? null)
+                setSearch(applied.search ?? "")
+                setActiveViewId(viewId)
+              }}
+            />
+          </div>
+        }
+        loading={isLoading}
+        loadingRows={6}
+        isEmpty={visible.length === 0}
+        empty={{
+          title: types.length === 0 ? "No component types yet" : "Nothing matches",
+          text:
+            types.length === 0
+              ? "A component type is a form this workspace stocks things against — its fields are what a row of stock records."
+              : "No type in this workspace answers to that.",
+          actions:
+            types.length === 0 ? [{ label: "New type", primary: true, onClick: () => setCreating(true) }] : [],
+        }}
+      >
+        <div className="flex flex-col gap-5 p-4">
+          {groups.map((group) => (
+            <CardGroup
+              key={group.id}
+              title={group.name}
+              icon={group.icon}
+              count={group.forms.length}
+              hue={hueOfGroup.get(group.id)}
+            >
+              {group.forms.map((form) => (
+                <TypeCard
+                  key={form.id}
+                  form={form}
+                  onOpenSchema={() => spaceSlug && navigate(spaceSectionPath(spaceSlug, `forms/${form.id}`))}
+                  onAddEntry={() => setOpenFormId(form.id)}
+                  onManage={() => setManagedTypeId(form.id)}
+                  onPreview={() => setPreviewTypeId(form.id)}
+                  onDelete={() =>
+                    deleteForm.mutate(form.id, {
+                      onSuccess: () => toast.success(`${form.name} deleted.`),
+                      onError: () => toast.error("Could not delete this type."),
+                    })
+                  }
+                />
+              ))}
+            </CardGroup>
+          ))}
         </div>
-      </div>
+      </ListScreen>
 
       {openFormId && (
         <EntryFormDialog
@@ -221,13 +213,13 @@ export function ComponentTypesPage() {
         />
       )}
 
-      {creating && <CreateFormDialog title="New component type" purposeCode={INVENTORY} onClose={() => setCreating(false)} />}
+      {creating && <CreateFormDialog title="New component type" purposeCode={COMPONENT_TYPE_PURPOSE} onClose={() => setCreating(false)} />}
 
       {/* ⚠️ **The same management dialog the form library opens**, and that is the point: a component
-          type IS a form with the `INVENTORY` purpose, so where it is filed, whether it is shared and how
+          type IS a form with the `CATALOG` purpose, so where it is filed, whether it is shared and how
           its entries are summarised are one set of answers. A second editor here would be a second place
           for them to be wrong. */}
-      {/* ⚠️ `domain`, not `base`: every form on this screen is an `INVENTORY` one inside this workspace,
+      {/* ⚠️ `domain`, not `base`: every form on this screen is a `CATALOG` one inside this workspace,
           so the subject area's own configuration — what counts as stock, what a price is read from —
           belongs here and nowhere in the library (Ivan, 2026-08-25). */}
       {managedType && (

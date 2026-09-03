@@ -1,10 +1,14 @@
 import { useState } from "react"
-import { Badge, Row, RowGroup, RowList, RowMeta, RowTitle, Skeleton } from "@jmouse/ui"
-import { AssetDrawer } from "@/components/custody/AssetDrawer"
+import { useNavigate } from "react-router-dom"
+import { Badge, PageState, Row, RowGroup, RowList, RowMeta, RowTitle } from "@jmouse/ui"
+import { AssetSheet } from "@/components/custody/AssetPanel"
 import { NothingNeedsYou } from "@/components/custody/NothingNeedsYou"
 import { LoadFailureNotice } from "@/components/LoadFailureNotice"
 import { PageHeader } from "@/components/PageHeader"
 import { useAttention } from "@/hooks/useAttention"
+import { useWorkspaceForms } from "@/hooks/useWorkspaceForms"
+import { spaceSectionPath } from "@/lib/navigationContext"
+import { useSpaceStore } from "@/stores/spaceStore"
 import { describeQueryFailure } from "@/lib/loadFailure"
 
 /**
@@ -26,8 +30,29 @@ import { describeQueryFailure } from "@/lib/loadFailure"
 export function AttentionPage() {
   const query = useAttention()
   const failure = describeQueryFailure(query, "attention")
+  const navigate = useNavigate()
 
   const [openAssetId, setOpenAssetId] = useState<string | null>(null)
+
+  /**
+   * ⚠️ **A row with nowhere to go is the one thing this screen must not have.** An item names its
+   * subject in the publisher's own words, and each kind needs its own way there: an asset opens a
+   * drawer, a position is an entry and needs its form as well as its id. That form is one per workspace
+   * — the inventory form — so it is resolved here rather than carried on every item.
+   */
+  const spaceSlug = useSpaceStore((state) => state.activeSpaceSlug)
+  const { data: inventoryForms = [] } = useWorkspaceForms("INVENTORY")
+  const inventoryFormId = inventoryForms[0]?.id ?? null
+
+  function open(item: { subjectKind: string; subjectId: string }) {
+    if (item.subjectKind === "asset") {
+      setOpenAssetId(item.subjectId)
+      return
+    }
+    if (item.subjectKind === "position" && spaceSlug && inventoryFormId) {
+      navigate(spaceSectionPath(spaceSlug, `inventory/entry/${inventoryFormId}/${item.subjectId}`))
+    }
+  }
 
   if (failure) {
     return <LoadFailureNotice failure={failure} onRetry={() => void query.refetch()} />
@@ -43,11 +68,12 @@ export function AttentionPage() {
         description="Everything the workspace thinks wants you, most urgent first."
       />
 
+      {/* ⚠️ No error branch here, and that is not an omission: `describeQueryFailure` above returns
+          early with `LoadFailureNotice`, which tells four kinds of failure apart — including the paused
+          one, which looks like patience rather than like an error. A `PageState kind="error"` beside it
+          would be a second, worse answer to the same question. */}
       {query.isLoading ? (
-        <div className="flex flex-col gap-3">
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-24 w-full" />
-        </div>
+        <PageState kind="loading" rows={6} />
       ) : total === 0 ? (
         /* ⚠️ **A slot, not a sentence.** An empty board reads identically whether the workspace is calm
            or whether nobody ever configured anything, and for a new workspace it is the only thing the
@@ -63,9 +89,9 @@ export function AttentionPage() {
                   <Row
                     key={`${group.key}:${item.subjectId}:${item.title}`}
                     // Every item leads to the thing that raised it, and to nowhere else. The action the
-                    // item names is inside that drawer — which is what keeps this screen from growing
-                    // its own copy of four features' buttons.
-                    onOpen={() => item.subjectKind === "asset" && setOpenAssetId(item.subjectId)}
+                    // item names is inside that drawer or on that record — which is what keeps this
+                    // screen from growing its own copy of five features' buttons.
+                    onOpen={() => open(item)}
                     trailing={item.actionLabel ? <Badge variant="outline">{item.actionLabel}</Badge> : undefined}
                   >
                     <RowTitle>{item.title}</RowTitle>
@@ -78,7 +104,7 @@ export function AttentionPage() {
         </div>
       )}
 
-      {openAssetId && <AssetDrawer assetId={openAssetId} onClose={() => setOpenAssetId(null)} />}
+      {openAssetId && <AssetSheet assetId={openAssetId} onClose={() => setOpenAssetId(null)} />}
     </>
   )
 }

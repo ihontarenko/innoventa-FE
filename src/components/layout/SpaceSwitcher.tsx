@@ -48,8 +48,8 @@ export function SpaceSwitcher() {
             merely a *child* of `DropdownMenu` is a button: Radix attaches nothing to it, so it carried
             no `aria-haspopup`, no `aria-expanded` and no `data-state`, and clicking it did nothing at
             all — silently, with no console error, because nothing was wrong except that nobody was
-            listening. `/ui-kit` had the trigger and worked, which is exactly why the kit is worth
-            having. */}
+            listening. Every other dropdown in this codebase had the trigger and worked, which is how it
+            was eventually found. */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton className="h-auto py-1.5">

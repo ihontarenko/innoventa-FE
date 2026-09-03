@@ -15,13 +15,19 @@ import {
   cn,
 } from "@jmouse/ui"
 import { composeFileFieldValue, parseFileFieldValue } from "@/api/files"
-import { pricingApi, type PricingOffer, type PricingResult } from "@/api/pricing"
+import { lookupApi, type LookupOffer, type LookupResult } from "@/api/lookup"
 import { OfferCard } from "@/components/lookup/OfferCard"
 import { SYNONYM_GROUP_MANUFACTURER, type ValueSynonym } from "@/api/valueSynonyms"
 import { useImportFile } from "@/hooks/useFiles"
 import { useValueSynonyms } from "@/hooks/useValueSynonyms"
-import { ATTACHMENT_MAPPINGS, OFFER_MAPPINGS, coerceForField, isAttachableField } from "@/lib/lookupMapping"
-import { PRICING_PROVIDERS } from "@/lib/pricingProviders"
+import {
+  ATTACHMENT_MAPPINGS,
+  OFFER_MAPPINGS,
+  coerceForField,
+  isAttachableField,
+  synonymsForMapping,
+} from "@/lib/lookupMapping"
+import { LOOKUP_PROVIDERS } from "@/lib/lookupProviders"
 import type { FieldDetail, FormDetail, FormEntry } from "@/types"
 
 /**
@@ -57,7 +63,7 @@ interface LookupLine {
  * holds arrives unticked, because losing an attachment somebody chose by hand is not something a
  * lookup may do quietly.
  *
- * ⚠️ **The form decides which field means what**, through its own `pricing.*` configuration. A type that
+ * ⚠️ **The form decides which field means what**, through its own `catalogue.*` configuration. A type that
  * names none of them cannot be filled from a lookup at all, and this dialog says so rather than guessing
  * which of twenty fields is the manufacturer.
  *
@@ -66,7 +72,7 @@ interface LookupLine {
  * line is shown, marked, and left unticked, and the Synonyms screen is where that is fixed once for
  * every future lookup.
  *
- * ⚠️ **The question carries the entry, not a search box.** `GET /entries/{id}/pricing/{provider}` builds
+ * ⚠️ **The question carries the entry, not a search box.** `GET /entries/{id}/lookup/{provider}` builds
  * the query from what the row already holds, so this asks about *this part* rather than about whatever
  * somebody would have typed.
  */
@@ -84,8 +90,8 @@ export function EntryLookupDialog({
   onApply: (values: Record<string, string>) => void
   onClose: () => void
 }) {
-  const [provider, setProvider] = useState(PRICING_PROVIDERS[0]?.id ?? "")
-  const [chosen, setChosen] = useState<PricingOffer | null>(null)
+  const [provider, setProvider] = useState(LOOKUP_PROVIDERS[0]?.id ?? "")
+  const [chosen, setChosen] = useState<LookupOffer | null>(null)
   const [skipped, setSkipped] = useState<Set<string>>(new Set())
 
   const { data: synonyms = [] } = useValueSynonyms()
@@ -98,9 +104,9 @@ export function EntryLookupDialog({
     isFetching,
     error,
     refetch,
-  } = useQuery<PricingResult>({
-    queryKey: ["entry-pricing", entry.id, provider],
-    queryFn: () => pricingApi.searchByEntry(entry.id, provider).then((response) => response.data),
+  } = useQuery<LookupResult>({
+    queryKey: ["entry-lookup", entry.id, provider],
+    queryFn: () => lookupApi.searchByEntry(entry.id, provider).then((response) => response.data),
     enabled: Boolean(provider),
     // ⚠️ Somebody else's API and a live price: a cached answer from ten minutes ago is the one thing
     // this dialog must not show.
@@ -130,7 +136,7 @@ export function EntryLookupDialog({
    * render — a tick somebody cleared has to stay cleared, and a default that is recomputed would put it
    * straight back.
    */
-  function chooseOffer(offer: PricingOffer) {
+  function chooseOffer(offer: LookupOffer) {
     const fresh = buildLines(offer, form, byName, entry, manufacturerSynonyms)
 
     setChosen(offer)
@@ -199,7 +205,7 @@ export function EntryLookupDialog({
             <span className="font-mono text-xs text-muted-foreground">{form.name}</span>
 
             <span className="ml-auto flex items-center gap-1">
-              {PRICING_PROVIDERS.map((candidate) => (
+              {LOOKUP_PROVIDERS.map((candidate) => (
                 <Button
                   key={candidate.id}
                   variant={candidate.id === provider ? "default" : "ghost"}
@@ -225,8 +231,8 @@ export function EntryLookupDialog({
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
           {!mappedAtAll && (
             <p className="mb-3 rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">
-              ⚠️ <strong>{form.name}</strong> names none of the <span className="font-mono">pricing.*</span> fields, so
-              an answer cannot be landed anywhere. Its Component types → Manage → Pricing pane is where that is said.
+              ⚠️ <strong>{form.name}</strong> names none of the <span className="font-mono">catalogue.*</span> fields, so
+              an answer cannot be landed anywhere. Its Component types → Manage → Catalogue pane is where that is said.
             </p>
           )}
 
@@ -365,13 +371,13 @@ export function EntryLookupDialog({
  * The chosen offer read against the row, as one list.
  *
  * ⚠️ **A field named by BOTH a value mapping and an attachment mapping is a copy, not a string.** A form
- * whose picture field is also its `pricing.image_url_field` would otherwise be offered the same field
+ * whose picture field is also its `catalogue.image_url_field` would otherwise be offered the same field
  * twice on one screen, and whichever line was ticked second would win — so the attachment wins and the
  * URL line is dropped, because the field is a file field and a URL written into one is text where a
  * picture should be.
  */
 function buildLines(
-  offer: PricingOffer,
+  offer: LookupOffer,
   form: FormDetail,
   byName: Map<string, FieldDetail>,
   entry: FormEntry,
@@ -405,14 +411,24 @@ function buildLines(
 
   const values = OFFER_MAPPINGS.flatMap((mapping) => {
     const fieldName = configs[mapping.configKey]?.trim()
-    const raw = mapping.read(offer)
 
-    if (!fieldName || !raw || attached.has(fieldName)) {
+    if (!fieldName || attached.has(fieldName)) {
       return []
     }
 
+    // ⚠️ The field is resolved BEFORE the value is read — a price carries its currency only where the
+    // field can hold one, so the mapping has to know what it is writing to.
     const field = byName.get(fieldName)
-    const coerced = coerceForField(raw, field, manufacturerSynonyms)
+    const raw = mapping.read(offer, field)
+
+    if (!raw) {
+      return []
+    }
+
+    // ⚠️ Through the shared decision, never the whole synonym list. This dialog used to hand manufacturer
+    // synonyms to every field, so a manufacturer spelling could land on a Category or Package dropdown
+    // and quietly rewrite it — the same offer applied here and in the add dialog stored different values.
+    const coerced = coerceForField(raw, field, synonymsForMapping(mapping.configKey, manufacturerSynonyms))
     const current = entry.fieldValues?.[fieldName] ?? ""
 
     return [

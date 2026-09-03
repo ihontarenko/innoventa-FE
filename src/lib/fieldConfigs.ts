@@ -13,6 +13,29 @@ export const FIELD_CONFIG_KEYS = {
 } as const
 
 /**
+ * What a field asks of a picture on its way in.
+ *
+ * ⚠️ **Read in one place and written in one place**, which is the whole reason they are named here
+ * rather than spelled out in each: `imageProcessing` turns them into a cropper specification and the
+ * editor's *Picture* card is the only screen that sets them. They were raw strings in the first of
+ * those and had a control on neither — see that card's own note.
+ */
+export const IMAGE_CONFIG_KEYS = {
+  /** `required` · `offered` (the default) · `off`. */
+  CROP: "image.crop",
+  /** The shapes the cropper offers — a list, or `none`. Silence offers all of them. */
+  RATIOS: "image.ratios",
+  /** `false` takes away the corner grips. */
+  RESHAPE: "image.reshape",
+  MAX_WIDTH: "image.max_width",
+  MAX_HEIGHT: "image.max_height",
+  /** `png` · `jpeg` · `webp`. Silence keeps whatever was uploaded. */
+  FORMAT: "image.format",
+  /** 0–1, and ignored for PNG. */
+  QUALITY: "image.quality",
+} as const
+
+/**
  * The help line under a field: the author's configured hint first, then the field's own description.
  *
  * ⚠️ A configured hint wins because it was written *for the person filling the form*, while a

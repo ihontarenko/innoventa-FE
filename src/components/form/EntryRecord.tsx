@@ -4,6 +4,7 @@ import { Badge, cn } from "@jmouse/ui"
 import { EntryPanel } from "@/components/entry/EntryPanel"
 import { EntryWidgets } from "@/components/form/EntryWidgets"
 import { FieldValue } from "@/components/form/FieldValue"
+import { optionsWithLabels, readableValueOf } from "@/lib/entryLabels"
 import { readFormConfigs } from "@/lib/formConfigs"
 import type { FieldDetail, FormDetail, FormEntry } from "@/types"
 
@@ -123,7 +124,9 @@ export function EntryIdentityCard({
 
   const highlighted = marked.length > 0 ? marked : (highlightFallback ?? [])
 
-  const title = titleField ? (entry.fieldValues[titleField.name] ?? "") : ""
+  // ⚠️ Through the resolved labels: a source-backed title field holds an IDENTIFIER, and printing it
+  // raw is how a position ends up titled `UT9qbvRJmqFaaiSQ` instead of `SS34 Schottky`.
+  const title = readableValueOf(entry, titleField)
   const picture = imageField ? (entry.fieldValues[imageField.name] ?? "") : ""
 
   return (
@@ -165,7 +168,7 @@ export function EntryIdentityCard({
                 value={entry.fieldValues[subtitleField.name]}
                 elementType={subtitleField.elementType}
                 unit={subtitleField.unit}
-                options={subtitleField.options}
+                options={optionsWithLabels(subtitleField, entry)}
               />
             </p>
           )}
@@ -381,7 +384,7 @@ function FactGrid({
                 value={stored}
                 elementType={field.elementType}
                 unit={field.unit}
-                options={withEntryLabels(field, entry)}
+                options={optionsWithLabels(field, entry)}
                 children={
                   isComposite
                     ? (field.children ?? []).map((child) => ({
@@ -423,16 +426,3 @@ function RowFillers({ count, emphasised }: { count: number; emphasised: boolean 
   )
 }
 
-/** ⚠️ Same rule as the table: a *sourced* value's label comes with the row, not with the field. */
-function withEntryLabels(field: FieldDetail, entry: FormEntry) {
-  const resolved = entry.optionLabels?.[field.name]
-
-  if (!resolved) {
-    return field.options
-  }
-
-  return field.options.map((option) => ({
-    ...option,
-    optionLabel: resolved[option.optionValue] ?? option.optionLabel,
-  }))
-}

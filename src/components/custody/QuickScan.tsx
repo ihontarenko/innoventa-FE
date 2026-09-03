@@ -14,7 +14,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@jmouse/ui"
-import { AssetDrawer } from "@/components/custody/AssetDrawer"
+import { AssetSheet } from "@/components/custody/AssetPanel"
 import { RecordReadingForm } from "@/components/custody/AssetReadings"
 import { ScanDialog } from "@/components/custody/ScanDialog"
 import { useCustodyModule, useMonitoringModule, usePickableMetrics } from "@/hooks/useMonitoring"
@@ -134,7 +134,7 @@ function WhatNow({ resolution, onClose }: { resolution: ScanResolution; onClose:
   )
 
   if (mode === "open" && isAsset) {
-    return <AssetDrawer assetId={assetId} onClose={onClose} />
+    return <AssetSheet assetId={assetId} onClose={onClose} />
   }
 
   return (

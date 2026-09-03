@@ -58,7 +58,11 @@ export function CraftsPage() {
     queryKey: ["crafts", "component-types", organizationId],
     queryFn: () =>
       spaceSettingsApi
-        .formsPaged(context.data!.organizations[0]!.spaceIds[0]!, 0, 500, "INVENTORY")
+        /* ⚠️ `CATALOG` — the kinds of component, not the one schema a position is recorded with. This
+           read `INVENTORY` until the two purposes swapped roles, after which it offered a craft
+           exactly one choice: "Inventory", the storage schema. The string looks the same for both
+           ideas, so it has to be said out loud which one is meant. */
+        .formsPaged(context.data!.organizations[0]!.spaceIds[0]!, 0, 500, "CATALOG")
         .then((response) => response.data.content.map((form) => ({ id: form.id, name: form.name }))),
     enabled: Boolean((context.data?.organizations[0]?.spaceIds.length ?? 0) > 0),
   })

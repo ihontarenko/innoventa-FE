@@ -2,8 +2,8 @@ import { useMemo, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { toast } from "sonner"
 import { ExternalLink } from "lucide-react"
-import { Badge, Button, type FilterItem, FilterPanel, Input, RowGroup, Skeleton } from "@jmouse/ui"
-import { PageHeader } from "@/components/PageHeader"
+import { Badge, Button, type FilterItem, RowGroup } from "@jmouse/ui"
+import { ListScreen } from "@/components/layout/ListScreen"
 import { CreateFieldDialog } from "@/components/form/CreateFieldDialog"
 import { ChildPickerDialog } from "@/components/form/builder/ChildPickerDialog"
 import { FieldCard } from "@/components/form/builder/FieldCard"
@@ -134,110 +134,91 @@ export function FieldsPage() {
 
   return (
     <>
-      <PageHeader
+      <ListScreen
         title="Fields"
         description={`${fields.length} reusable definitions — a field belongs to no one form`}
-        actions={
-          <>
-            <Input
-              className="h-8 w-56 text-sm"
-              value={search}
-              placeholder="Search fields…"
-              onChange={(event) => setSearch(event.target.value)}
-            />
-            <Button size="sm" onClick={() => setCreating(true)}>
-              New field
-            </Button>
-          </>
-        }
-      />
+        search={{ value: search, onChange: setSearch, placeholder: "Search fields…" }}
+        action={{ label: "New field", onClick: () => setCreating(true) }}
+        rail={{
+          title: "Filter",
+          items: items,
+          activeKey: activeKey,
+          onSelect: setActiveKey,
+          allLabel: "All fields",
+          allIcon: "▣",
+          allCount: fields.length,
+          searchable: true,
+          searchPlaceholder: "Filter the filters…",
+        }}
+        loading={isLoading}
+        isEmpty={visible.length === 0}
+        empty={{
+          title: fields.length === 0 ? "No fields yet" : "Nothing matches",
+          text:
+            fields.length === 0
+              ? "A field is a reusable definition — a name, a shape and a unit — that forms attach rather than copy."
+              : "No field in this installation answers to that.",
+          actions:
+            fields.length === 0 ? [{ label: "New field", primary: true, onClick: () => setCreating(true) }] : [],
+        }}
+      >
+        <div className="p-4">
+          <RowGroup tally={`${visible.length} of ${fields.length}`}>
+            <div className="flex flex-col gap-1.5">
+              {visible.map((field) => (
+                <FieldCard
+                  key={field.id}
+                  field={field}
+                  isExpanded={expandedId === field.id}
+                  onToggle={() => onToggle(field)}
+                  badges={<CatalogueBadges field={field} />}
+                  actions={
+                    <>
+                      <Button asChild variant="ghost" size="icon" className="size-6" aria-label="Open as a page">
+                        <Link to={fieldPath(field.id)} onClick={(event) => event.stopPropagation()}>
+                          <ExternalLink className="size-3" />
+                        </Link>
+                      </Button>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[15rem_minmax(0,1fr)]">
-        <FilterPanel
-          title="Filter"
-          items={items}
-          activeKey={activeKey}
-          onSelect={setActiveKey}
-          allLabel="All fields"
-          allIcon="▣"
-          allCount={fields.length}
-          searchable
-          searchPlaceholder="Filter the filters…"
-        />
-
-        <div className="flex min-w-0 flex-col gap-3">
-          {isLoading ? (
-            <Skeleton className="h-64 w-full" />
-          ) : visible.length === 0 ? (
-            <div className="flex flex-col items-center gap-1.5 rounded-md border border-dashed px-6 py-10 text-center">
-              <span aria-hidden="true" className="text-2xl">
-                ▣
-              </span>
-              <span className="text-sm font-medium">{fields.length === 0 ? "No fields yet" : "Nothing matches"}</span>
-              <span className="max-w-md text-xs text-muted-foreground">
-                {fields.length === 0
-                  ? "A field is a reusable definition — a name, a shape and a unit — that forms attach rather than copy."
-                  : "No field in this installation answers to that."}
-              </span>
-            </div>
-          ) : (
-            <RowGroup tally={`${visible.length} of ${fields.length}`}>
-              <div className="flex flex-col gap-1.5">
-                {visible.map((field) => (
-                  <FieldCard
-                    key={field.id}
-                    field={field}
-                    isExpanded={expandedId === field.id}
-                    onToggle={() => onToggle(field)}
-                    badges={<CatalogueBadges field={field} />}
+                      {removingId === field.id ? (
+                        <Button variant="destructive" size="sm" onClick={() => onRemove(field)}>
+                          Really delete
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:bg-destructive/10"
+                          onClick={() => setRemovingId(field.id)}
+                        >
+                          Delete
+                        </Button>
+                      )}
+                    </>
+                  }
+                >
+                  {/* ⚠️ No `form`, so no *Condition* card — a condition names sibling fields, and a
+                      catalogued field has none. Everything else a field owns is editable here. */}
+                  <FieldEditor
+                    fieldId={field.id}
+                    variant="inline"
+                    onPickChild={() => setPickingChild(true)}
+                    onClose={() => setExpandedId(null)}
                     actions={
-                      <>
-                        <Button asChild variant="ghost" size="icon" className="size-6" aria-label="Open as a page">
-                          <Link to={fieldPath(field.id)} onClick={(event) => event.stopPropagation()}>
-                            <ExternalLink className="size-3" />
-                          </Link>
-                        </Button>
-
-                        {removingId === field.id ? (
-                          <Button variant="destructive" size="sm" onClick={() => onRemove(field)}>
-                            Really delete
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-destructive hover:bg-destructive/10"
-                            onClick={() => setRemovingId(field.id)}
-                          >
-                            Delete
-                          </Button>
-                        )}
-                      </>
+                      <Button asChild variant="ghost" size="sm">
+                        <Link to={fieldPath(field.id)}>
+                          <ExternalLink className="size-3.5" />
+                          Open as a page
+                        </Link>
+                      </Button>
                     }
-                  >
-                    {/* ⚠️ No `form`, so no *Condition* card — a condition names sibling fields, and a
-                        catalogued field has none. Everything else a field owns is editable here. */}
-                    <FieldEditor
-                      fieldId={field.id}
-                      variant="inline"
-                      onPickChild={() => setPickingChild(true)}
-                      onClose={() => setExpandedId(null)}
-                      actions={
-                        <Button asChild variant="ghost" size="sm">
-                          <Link to={fieldPath(field.id)}>
-                            <ExternalLink className="size-3.5" />
-                            Open as a page
-                          </Link>
-                        </Button>
-                      }
-                    />
-                  </FieldCard>
-                ))}
-              </div>
-            </RowGroup>
-          )}
+                  />
+                </FieldCard>
+              ))}
+            </div>
+          </RowGroup>
         </div>
-      </div>
+      </ListScreen>
 
       {creating && <CreateFieldDialog onClose={() => setCreating(false)} />}
 
