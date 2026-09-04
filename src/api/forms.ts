@@ -75,15 +75,71 @@ export const formsApi = {
    * ⚠️ **Deletions go first.** A key being replaced by nothing and a key being replaced by a value are
    * the same intent; clearing afterwards would race a write of the same key.
    */
-  replaceConfig: async (formId: string, next: Record<string, string>) => {
+  replaceConfig: async (
+    formId: string,
+    next: Record<string, string>,
+    /**
+     * What the caller was holding when the reader started editing — the server's own answer, not the
+     * draft. ⚠️ **Required, and it is the entire safety mechanism.** See below.
+     */
+    baseline: Record<string, string>,
+  ) => {
     const current = await formsApi.getConfig(formId).then((response) => response.data)
-    const removed = Object.keys(current).filter((key) => !(key in next))
+
+    /*
+     * ⚠️ **A CALLER MAY ONLY DELETE A KEY IT ACTUALLY HAD.**
+     *
+     * A key stored on the form that is in neither the draft nor the baseline is not *absent from the
+     * save* — it is **unknown to the caller**, and unknown must never mean delete. That distinction is
+     * the whole fix, and it is exact rather than a heuristic about how many keys look like too many.
+     *
+     * ⚠️ **This is not defensive decoration — it happened twice in twenty minutes.** On 2026-09-04 the
+     * `vr` component type lost all twenty-one of its keys — `display.primary_field`,
+     * `display.secondary_field`, every catalogue mapping, its validation document — and then lost them
+     * again after being restored. The audit trail both times is twenty `deleteConfiguration` events
+     * **under twenty separate operation ids** plus one `setConfiguration` carrying a single key: twenty
+     * one HTTP requests, which is this function and nothing else in the interface.
+     *
+     * The consequence was not subtle. A record is called by `display.primary_field`, so every voltage
+     * regulator in the catalogue and every position holding one lost its name. Ivan: *«в інвентарі чому
+     * не тянуться правильні назви????»*, and after the restore, *«оновив картинку і знову затерлись всі
+     * конфіги»*.
+     *
+     * ⚠️ **Refusing an EMPTY draft was the first attempt and it was not enough**, which is why the rule
+     * is now about provenance rather than about size: the draft was not empty, it held exactly one key,
+     * and one key is a perfectly ordinary save. What was wrong with it was never its size — it was that
+     * it had never been seeded, so its silence about twenty keys was ignorance rather than intent.
+     *
+     * A caller that really does mean to remove keys — the raw editor, where the text IS the
+     * configuration — passes the seeded map as `baseline` and its removals go through as they always
+     * did.
+     */
+    const unknown = Object.keys(current).filter((key) => !(key in next) && !(key in baseline))
+    const removed = Object.keys(current).filter((key) => !(key in next) && key in baseline)
+
+    if (unknown.length > 0) {
+      /* Left alone rather than thrown on: the write the reader asked for is legitimate and goes
+         through. Logged because a caller passing a baseline it did not seed is a bug in that caller,
+         and it is otherwise completely silent. */
+      console.warn(
+        `[forms] keeping ${unknown.length} configuration key(s) of ${formId} that this save never saw: ` +
+          `${unknown.join(", ")}. A key absent from an unseeded draft is unknown, not deleted.`,
+      )
+    }
 
     for (const key of removed) {
       await formsApi.clearConfigValue(formId, key)
     }
 
-    return formsApi.setConfigValues(formId, next)
+    /*
+     * ⚠️ **The kept keys are sent BACK, because this endpoint is `replaceAll` and deletes what the body
+     * omits.** Leaving them out of the payload would have the server delete exactly the keys this
+     * function just decided not to delete — the guard above would read as protection and do nothing.
+     * `FormConfigController.replaceAll`: *"upserts the entries given, deletes the rest"*.
+     */
+    const kept = Object.fromEntries(unknown.map((key) => [key, current[key]]))
+
+    return formsApi.setConfigValues(formId, { ...kept, ...next })
   },
 }
 

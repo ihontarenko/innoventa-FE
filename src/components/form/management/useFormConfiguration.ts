@@ -19,18 +19,35 @@ export function useFormConfiguration(formId: string) {
   const { data: form } = useForm(formId)
 
   const [config, setConfig] = useState<Record<string, string>>({})
+  /*
+   * ⚠️ **Whether the draft is the server's answer or merely the initial `{}` — and the difference is a
+   * form's whole configuration.** The save replaces the map wholesale, so a draft that has not been
+   * seeded is not "empty", it is *unknown*, and writing it deletes every key the form holds. That is
+   * exactly what happened to the `vr` component type on 2026-09-04: twenty-one keys gone in one second,
+   * every voltage regulator in the catalogue left without the `display.primary_field` that names it.
+   *
+   * `form` being truthy is NOT the same question. A `FormSummary` carries no `config` at all (see the
+   * note above), so `form.config ?? {}` reads as an empty configuration for a form that has one — the
+   * seeding looks like it happened and the draft is still unknown.
+   */
+  const [isSeeded, setSeeded] = useState(false)
 
   // ⚠️ Seeded from the server and re-seeded whenever it answers again. Keyed on the query's own object
   // rather than on the id, because a save is followed by an invalidation and the fresh answer IS the
   // new baseline — without this, `isDirty` would stay true after a successful write.
   useEffect(() => {
-    if (form) {
-      setConfig(form.config ?? {})
+    if (form?.config !== undefined) {
+      setConfig(form.config)
+      setSeeded(true)
     }
   }, [form])
 
   const save = useMutation({
-    mutationFn: (next: Record<string, string>) => formsApi.replaceConfig(formId, next),
+    /* ⚠️ **The baseline is the SERVER's answer, never the draft.** `replaceConfig` deletes only keys the
+       caller demonstrably had; handing it the draft as its own baseline would make that check vacuous
+       and hand back the bug it exists to stop. Where the answer carries no config the baseline is empty
+       and nothing is deleted at all — which is exactly right, because then nothing was ever read. */
+    mutationFn: (next: Record<string, string>) => formsApi.replaceConfig(formId, next, form?.config ?? {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["forms"] })
       queryClient.invalidateQueries({ queryKey: ["forms", formId] })
@@ -58,9 +75,15 @@ export function useFormConfiguration(formId: string) {
     config,
     setConfig,
     setValue,
-    isDirty: serialise(config) !== serialise(form?.config ?? {}),
+    /* ⚠️ Nothing is dirty before the draft is the server's — otherwise the Save button offers to write
+       a map nobody has read, which is the whole failure this guard exists for. */
+    isDirty: isSeeded && serialise(config) !== serialise(form?.config ?? {}),
     isSaving: save.isPending,
-    save: () => save.mutate(config),
+    save: () => {
+      if (isSeeded) {
+        save.mutate(config)
+      }
+    },
   }
 }
 
